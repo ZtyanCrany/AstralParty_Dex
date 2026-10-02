@@ -1,0 +1,38 @@
+# ── 逆向笔记 / 内部规划（不随仓库发布）──
+#   里面含个人机器路径、账号 UID、服务端数据清单与抓包实测记录；
+#   对外只需要 README + 源码本身（数据表在 assets/data/，是运行必需的，照发）。
+#   想发其中某些「纯数据表」（如 筹码ID对照表、协议命令号表）时，挑出来单独放即可。
+docs/
+
+# ★★★ 官方美术资源：绝不能进仓库（游戏美术版权 + 分发洁癖）
+#   软件运行时改为「从本机游戏资源包提取」到 userdata/assets/，所以这两份只是
+#   开发目录里的对照物，删掉也不影响运行（_art_dir 会回落到 userdata/）。
+#   打包脚本 tools/make_release.py 里也有同样的禁入复核。
+assets/avatars/
+assets/photos/
+assets/data/potential_live.json
+
+# 用户数据（登录态、回放缓存、导出结果）—— 绝对不能提交
+userdata/
+导出/
+
+# 构建产物
+build/
+dist/
+*.spec
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store
+_capture/
+tools/_legacy/

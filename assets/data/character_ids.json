@@ -1,0 +1,317 @@
+[
+ {
+  "pos": 1,
+  "id": 101,
+  "name": "帕露南",
+  "fightCount": 7,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 2,
+  "id": 102,
+  "name": "芬妮",
+  "fightCount": 105,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 3,
+  "id": 103,
+  "name": "阿兰娜",
+  "fightCount": 29,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 4,
+  "id": 104,
+  "name": "小町",
+  "fightCount": 6,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 5,
+  "id": 105,
+  "name": "派德曼",
+  "fightCount": 23,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 6,
+  "id": 106,
+  "name": "帕帕拉",
+  "fightCount": 6,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 7,
+  "id": 107,
+  "name": "恋",
+  "fightCount": 1,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 8,
+  "id": 108,
+  "name": "米米",
+  "fightCount": 15,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 9,
+  "id": 109,
+  "name": "Z3000",
+  "fightCount": 12,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 10,
+  "id": 110,
+  "name": "潘大猛",
+  "fightCount": "—",
+  "lv": 5,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 11,
+  "id": 111,
+  "name": "墨影",
+  "fightCount": "—",
+  "lv": 5,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 12,
+  "id": 112,
+  "name": "璐璐",
+  "fightCount": 23,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 13,
+  "id": 113,
+  "name": "姬梦枫",
+  "fightCount": 31,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 14,
+  "id": 114,
+  "name": "蓝海晴",
+  "fightCount": 4,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 15,
+  "id": 115,
+  "name": "美咲",
+  "fightCount": 53,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 16,
+  "id": 116,
+  "name": "娜蒂斯",
+  "fightCount": 23,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 17,
+  "id": 117,
+  "name": "茉莉",
+  "fightCount": 85,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 18,
+  "id": 118,
+  "name": "阿尔",
+  "fightCount": "—",
+  "lv": 0,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 19,
+  "id": 119,
+  "name": "星魅琉华",
+  "fightCount": 11,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 20,
+  "id": 120,
+  "name": "南希露",
+  "fightCount": 19,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 21,
+  "id": 121,
+  "name": "凛",
+  "fightCount": 4,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 22,
+  "id": 122,
+  "name": "梅加斯",
+  "fightCount": 64,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 23,
+  "id": 123,
+  "name": "姬梦朝",
+  "fightCount": 17,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 24,
+  "id": 124,
+  "name": "照",
+  "fightCount": 18,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 25,
+  "id": 125,
+  "name": "摩西",
+  "fightCount": "—",
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 26,
+  "id": 126,
+  "name": "真梦梓",
+  "fightCount": 14,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 27,
+  "id": 127,
+  "name": "邦妮",
+  "fightCount": 21,
+  "lv": 6,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 28,
+  "id": 128,
+  "name": "玲玲",
+  "fightCount": 2,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 29,
+  "id": 129,
+  "name": "赛克斯",
+  "fightCount": 24,
+  "lv": 5,
+  "breakthrough": true,
+  "inRoleCard": true
+ },
+ {
+  "pos": 30,
+  "id": 301,
+  "name": "超绝最可爱天使酱",
+  "fightCount": "—",
+  "lv": null,
+  "breakthrough": null,
+  "inRoleCard": false
+ },
+ {
+  "pos": 31,
+  "id": 302,
+  "name": "主播女孩",
+  "fightCount": "—",
+  "lv": null,
+  "breakthrough": null,
+  "inRoleCard": false
+ },
+ {
+  "pos": 32,
+  "id": 303,
+  "name": "吉尔·斯汀雷",
+  "fightCount": 4,
+  "lv": 0,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 33,
+  "id": 304,
+  "name": "多萝西·海兹",
+  "fightCount": 56,
+  "lv": 0,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 34,
+  "id": 305,
+  "name": "远野汉娜",
+  "fightCount": 2,
+  "lv": 0,
+  "breakthrough": false,
+  "inRoleCard": true
+ },
+ {
+  "pos": 35,
+  "id": 306,
+  "name": "橘雪莉",
+  "fightCount": 9,
+  "lv": 0,
+  "breakthrough": false,
+  "inRoleCard": true
+ }
+]

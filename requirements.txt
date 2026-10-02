@@ -1,0 +1,7 @@
+# 星趴档案 —— 运行依赖
+pywebview>=4.4          # 打包界面（Windows 用系统自带的 WebView2）
+protobuf>=4.21          # 解析游戏协议与回放文件
+UnityPy>=1.25           # 从本机游戏资源包提取角色头像 / 立绘头像（运行时补全）
+texture2ddecoder>=1.0   # UnityPy 解压压缩贴图（DXT / ETC）用
+lz4>=4.0                # UnityPy 读 LZ4 压缩的资源包
+etcpak>=0.9             # UnityPy 读 ETC 压缩贴图

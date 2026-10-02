@@ -1,0 +1,958 @@
+[
+ {
+  "id": 50001,
+  "name": "拳击手套-初级",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50002,
+  "name": "拳击手套-中级",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50003,
+  "name": "拳击手套-高级",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50004,
+  "name": "速度轮滑-初级",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50005,
+  "name": "速度轮滑-中级",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50006,
+  "name": "速度轮滑-高级",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50007,
+  "name": "夹心饼干-一般",
+  "quality": "蓝",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50008,
+  "name": "夹心饼干-可口",
+  "quality": "紫",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50009,
+  "name": "夹心饼干-美味",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack,Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50010,
+  "name": "美工刀-初级",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack,Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50011,
+  "name": "美工刀-锋利",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack,Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50013,
+  "name": "手电筒-强光",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50015,
+  "name": "银行卡-余额少",
+  "quality": "蓝",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50016,
+  "name": "银行卡-余额多",
+  "quality": "紫",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50017,
+  "name": "银行卡-用不完",
+  "quality": "金",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50018,
+  "name": "摩托头盔-一般",
+  "quality": "蓝",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50019,
+  "name": "摩托头盔-中级",
+  "quality": "紫",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50020,
+  "name": "摩托头盔-高级",
+  "quality": "金",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50021,
+  "name": "医疗箱-紧急治疗",
+  "quality": "蓝",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50022,
+  "name": "医疗箱-完备治疗",
+  "quality": "金",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50024,
+  "name": "肾上腺素-高效",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50025,
+  "name": "额外电池",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50026,
+  "name": "会员推荐信",
+  "quality": "蓝",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50027,
+  "name": "维生素药丸",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card,Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50028,
+  "name": "大背包",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50029,
+  "name": "魔法秘典",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50030,
+  "name": "手持风扇-小",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50031,
+  "name": "智能手表",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50032,
+  "name": "标记喷罐",
+  "quality": "蓝",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50033,
+  "name": "可口糖果",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card,Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50034,
+  "name": "大碗炖肉",
+  "quality": "金",
+  "tag": "Tank",
+  "tag_full": "Tank,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50035,
+  "name": "小猪存钱罐",
+  "quality": "蓝",
+  "tag": "Card",
+  "tag_full": "Card,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50036,
+  "name": "“8面”骰子",
+  "quality": "蓝",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50037,
+  "name": "诅咒之剑",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82008
+  ]
+ },
+ {
+  "id": 50038,
+  "name": "复仇之戟",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82008
+  ]
+ },
+ {
+  "id": 50039,
+  "name": "贯穿之铳",
+  "quality": "金",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82008
+  ]
+ },
+ {
+  "id": 50040,
+  "name": "缓冲盾牌",
+  "quality": "蓝",
+  "tag": "Tank",
+  "tag_full": "Tank,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50041,
+  "name": "友情微章",
+  "quality": "紫",
+  "tag": "Tank",
+  "tag_full": "Tank,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50042,
+  "name": "ATM机",
+  "quality": "蓝",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50043,
+  "name": "星币锤",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack,Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50044,
+  "name": "鹰眼瞄具",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50045,
+  "name": "忍术飞镖",
+  "quality": "金",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50046,
+  "name": "标靶",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50047,
+  "name": "魔法箭袋",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50048,
+  "name": "手持风扇-大",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50049,
+  "name": "佐茶蛋糕",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82012
+  ]
+ },
+ {
+  "id": 50050,
+  "name": "古老法杖",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82012
+  ]
+ },
+ {
+  "id": 50051,
+  "name": "精品剑盾",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82012
+  ]
+ },
+ {
+  "id": 50052,
+  "name": "普通瞄具",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50053,
+  "name": "大铁锚",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82007
+  ]
+ },
+ {
+  "id": 50054,
+  "name": "梦想号模型",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82007
+  ]
+ },
+ {
+  "id": 50055,
+  "name": "三叉戟",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82007
+  ]
+ },
+ {
+  "id": 50056,
+  "name": "惊涛御守",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50057,
+  "name": "迷幻海鲜汤",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50058,
+  "name": "无限之蛇",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50059,
+  "name": "交错双鲤",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50060,
+  "name": "小蛇玩偶",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82013
+  ]
+ },
+ {
+  "id": 50061,
+  "name": "小鲤鱼玩偶",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82013
+  ]
+ },
+ {
+  "id": 50062,
+  "name": "计时器",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82014
+  ]
+ },
+ {
+  "id": 50063,
+  "name": "重生人偶",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82014
+  ]
+ },
+ {
+  "id": 50064,
+  "name": "糖果会员证",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82014
+  ]
+ },
+ {
+  "id": 50065,
+  "name": "优雅之羽",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50066,
+  "name": "探天卫星",
+  "quality": "金",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50067,
+  "name": "彩羽手环",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82015
+  ]
+ },
+ {
+  "id": 50068,
+  "name": "鸳鸯玉佩",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82015
+  ]
+ },
+ {
+  "id": 50069,
+  "name": "孔雀扇",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82015
+  ]
+ },
+ {
+  "id": 50070,
+  "name": "大铜锣",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82010
+  ]
+ },
+ {
+  "id": 50071,
+  "name": "节日红包",
+  "quality": "金",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82010
+  ]
+ },
+ {
+  "id": 50072,
+  "name": "电击枪",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50073,
+  "name": "运动手环",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   83001,
+   83002,
+   83003
+  ]
+ },
+ {
+  "id": 50074,
+  "name": "时间怀表",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   83001,
+   83002,
+   83003
+  ]
+ },
+ {
+  "id": 50075,
+  "name": "自适应核心",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   83003
+  ]
+ },
+ {
+  "id": 50076,
+  "name": "娱乐终端",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   83003
+  ]
+ },
+ {
+  "id": 50077,
+  "name": "原初意识",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   81005
+  ]
+ },
+ {
+  "id": 50078,
+  "name": "紫色飞星",
+  "quality": "紫",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50079,
+  "name": "金色飞星",
+  "quality": "金",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50081,
+  "name": "书签",
+  "quality": "蓝",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50082,
+  "name": "磨刀石",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50083,
+  "name": "循环往复",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50084,
+  "name": "能量回收",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50085,
+  "name": "电流剑",
+  "quality": "蓝",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50086,
+  "name": "安全气囊",
+  "quality": "紫",
+  "tag": "Tank",
+  "tag_full": "Tank",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50087,
+  "name": "电击手套",
+  "quality": "紫",
+  "tag": "Card",
+  "tag_full": "Card",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50088,
+  "name": "跃迁引擎",
+  "quality": "蓝",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50089,
+  "name": "电流核心",
+  "quality": "紫",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50090,
+  "name": "永动机",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50091,
+  "name": "电磁炮",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50092,
+  "name": "放大镜",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82016
+  ]
+ },
+ {
+  "id": 50093,
+  "name": "汉娜人偶",
+  "quality": "金",
+  "tag": "Support",
+  "tag_full": "Support",
+  "desc": "",
+  "style": "",
+  "map_limit": [
+   82016
+  ]
+ }
+]
