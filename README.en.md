@@ -41,19 +41,19 @@ Click a player name inside 「Recent Matches」 to open that player's replay win
 
 ![My Profile](screenshots/01-profile.png)
 
-**My Skins** — every skin of every character, owned or not, with bond status / level / potential
-
-![My Skins](screenshots/02-skins.png)
-
 **Recent Matches** — the latest 10 matches, expandable to all four players' full stats
 
-![Recent Matches](screenshots/03-matches.png)
+![Recent Matches](screenshots/02-matches.png)
 
 **Replay Breakdown** — click a player name inside a match to open it
 
-![Replay Breakdown](screenshots/04-replay.png)
+![Replay Breakdown](screenshots/03-replay.png)
 
-![Replay detail](screenshots/05-replay-detail.png)
+![Replay detail](screenshots/04-replay-detail.png)
+
+**My Skins** — every skin of every character, owned or not, with bond status / level / potential
+
+![My Skins](screenshots/05-skins.png)
 
 **Login**
 

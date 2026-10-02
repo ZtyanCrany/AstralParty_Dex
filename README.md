@@ -40,19 +40,19 @@
 
 ![我的信息](screenshots/01-profile.png)
 
-**我的皮肤** —— 按角色列出全部皮肤，标注已拥有 / 未拥有、羁绊状态、等级与潜能
-
-![我的皮肤](screenshots/02-skins.png)
-
 **最近对局** —— 最近 10 局，展开看四位玩家的完整战绩表
 
-![最近对局](screenshots/03-matches.png)
+![最近对局](screenshots/02-matches.png)
 
 **对局复盘** —— 在「最近对局」里**点击玩家名字**弹出
 
-![复盘弹窗](screenshots/04-replay.png)
+![复盘弹窗](screenshots/03-replay.png)
 
-![复盘明细](screenshots/05-replay-detail.png)
+![复盘明细](screenshots/04-replay-detail.png)
+
+**我的皮肤** —— 按角色列出全部皮肤，标注已拥有 / 未拥有、羁绊状态、等级与潜能
+
+![我的皮肤](screenshots/05-skins.png)
 
 **登录页面**
 
