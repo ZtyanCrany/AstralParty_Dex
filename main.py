@@ -148,14 +148,16 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.1.1'        # 工具版本号
+VERSION = 'v1.2.0-beta.6'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 REPLAY_URL = 'https://sereplaycn.feimogames.com/prod/%s'
 
 # ── 列表用的「只抓开头」方案 ──
 # 地图 ID 在回放文件开头 300 字节内（字段5 = fixed32 小端），
-# 服务器支持 HTTP Range → 只下 8KB 就能拿到地图，不用拉整个 1.2MB。
-REPLAY_PREFIX = 8192
+# 服务器支持 HTTP Range → 不用拉整个 1.2MB。
+# 前缀长度按难度字段定：第 1 个 Room 帧（含 #48 difficulty）整条消息要 ~24KB 才完整，
+# 16KB 都解不出帧，所以取 32KB（一次请求同时拿到地图名和难度）。
+REPLAY_PREFIX = 32768
 _MAP_CACHE_FILE = DATA_DIR / 'replay_maps.json'
 _map_cache = {}
 
@@ -188,22 +190,42 @@ def map_from_prefix(buf):
     return 0
 
 
+def diff_from_prefix(buf):
+    """从回放前缀里取难度（第 1 个 Room 帧的 #48 difficulty）。
+
+    取不到（前缀不够长 / 老回放结构）返回 None —— 界面上就不显示难度。
+    """
+    try:
+        from astral import replay as _rp
+        rp = _rp.Replay(buf)
+        for f in rp.frames:
+            room = f.get('room')
+            if room is None:
+                continue
+            if getattr(room, 'difficulty', 0) or getattr(room, 'mapDifficultyId', 0):
+                return int(getattr(room, 'difficulty', 0) or 0)
+    except Exception:
+        pass
+    return None
+
+
 def fetch_replay_map(replay_id):
-    """只下载回放开头，返回 {'id':.., 'name':..}；结果落盘缓存。"""
+    """只下载回放开头，返回 {'id','name','diff'}；结果落盘缓存。"""
     rid = str(replay_id or '')
     if not rid:
         return None
-    if rid in _map_cache:
-        return _map_cache[rid]
+    if rid in _map_cache and 'diff' in (_map_cache.get(rid) or {}):
+        return _map_cache[rid]              # 旧缓存没有 diff 字段 ⇒ 当未命中，重新抓
     try:
         req = urllib.request.Request(
             REPLAY_URL % rid, headers={'Range': 'bytes=0-%d' % (REPLAY_PREFIX - 1)})
         with urllib.request.urlopen(req, timeout=15) as r:
             buf = r.read(REPLAY_PREFIX)
         mid = map_from_prefix(buf)
+        df = diff_from_prefix(buf)
     except Exception:
         return None
-    info = {'id': mid, 'name': map_name(mid) or '未知地图'}
+    info = {'id': mid, 'name': map_name(mid) or '未知地图', 'diff': df}
     _map_cache[rid] = info
     return info
 
@@ -406,6 +428,43 @@ def _load_skin_wiki():
 
 
 
+# 联动角色（301~306，主播女孩重度依赖 / VA-11 HALL-A 联动）：
+# 没有羁绊皮肤，且背包里没有 <角色>001 这条「初始皮肤」记录（只有 003 起的名皮）。
+COLLAB_IDS = {301, 302, 303, 304, 305, 306}
+# 上面这个名单只是打底：更可靠的证据来自本机游戏资源 —— 立绘变体里没有 Max 的角色必然
+# 没有羁绊皮肤（35 个角色里恰好就是这六个）。两者取并集，下次出新联动角色不用改代码；
+# 读不到游戏资源（没装游戏 / 没启动过）时退化成只用上面这张表，行为不变。
+_BONDLESS = None
+
+
+# ── 联动角色的皮肤号段（按批次整体编号）────────────────────────────────────
+#
+# 同一次联动的多个角色共用一个 1003XX000 号段，排布：先排所有角色的初始皮肤，再排名皮
+# （第 k 个角色的初始 = 1+k，第 j 套名皮 = 2+k+j）。
+# 所以 100301004 字面上属于「301 的第 4 号」，实际是 302(糖糖) 的休闲日常。
+#
+# 依据：100301001 / 100301003 分别点亮超天酱的初始与名皮（旧规则恰好命中）；
+#       302 的 roleCard.useAdorn 指向 100301004，即该角色当前穿着的那一套；
+#       背包里没有 100302xxx，只有 120302xxx（表情/头像这类，不算皮肤）。
+# 遇到新联动批次时，按同一规则往这里补一项即可。
+COLLAB_SKIN_SLOTS = {
+    100301001: (301, 1), 100301002: (302, 1),
+    100301003: (301, 2), 100301004: (302, 2),
+}
+
+
+def _bondless():
+    """本机游戏资源给出的「没有羁绊皮肤」角色集合；取不到返回空集合。"""
+    global _BONDLESS
+    if _BONDLESS is None:
+        try:
+            from astral import gameart
+            _BONDLESS = set(gameart.bondless_ids())
+        except Exception:
+            _BONDLESS = set()
+    return _BONDLESS
+
+
 def build_skins(p):
     """皮肤清单：直接从背包的 100<角色ID><序号> 空间读取，不做推断。
 
@@ -420,36 +479,69 @@ def build_skins(p):
     # ① 背包里 100 + 3位角色ID + 3位序号
     owned = {}
     for it in getattr(p, 'bag_items', []) or []:
-        s = str(int(getattr(it, 'item_id', 0)))
+        iid = int(getattr(it, 'item_id', 0))
+        if iid in COLLAB_SKIN_SLOTS:        # 联动批次号段 ⇒ 按登记表还原到真正的角色
+            cid, slot = COLLAB_SKIN_SLOTS[iid]
+            owned.setdefault(cid, set()).add(slot)
+            continue
+        s = str(iid)
         if len(s) == 9 and s.startswith('100'):
             owned.setdefault(int(s[3:6]), set()).add(int(s[6:]))
 
     out, tot_orig, tot_bond, tot_buy, n_ctr = [], 0, 0, 0, 0
-    for hid in sorted(getattr(p, 'roleCard', {}).keys()):
-        card = p.roleCard[hid]
+    cards = getattr(p, 'roleCard', {}) or {}
+    # 未拥有的角色也一并列出（全清单）：它们没有背包记录 ⇒ 所有格子自然是灰的
+    for hid in sorted(set(by_id.keys()) | set(cards.keys()) | set(owned.keys())):
+        card = cards.get(hid)
+        owns = card is not None
         has = owned.get(hid, set())
         nm, v = by_id.get(hid, ('角色#%d' % hid, {}))
         names = v.get('skins') or []
         contract = bool(getattr(card, 'isBreakThrough', False))
-        rows = [{'name': '初始皮肤', 'has': 1 in has},
-                {'name': '羁绊皮肤', 'has': 2 in has}]
+        collab = (hid in COLLAB_IDS) or (hid in _bondless())   # 名单打底 + 本机立绘证据
+        # 联动角色没有羁绊皮肤（不显示这一格）；且背包里没有 <角色>001 这条初始皮肤
+        # 记录，但「拥有角色」本身就等于拥有其初始外观 ⇒ 已拥有时初始皮肤直接算已拥有。
+        # 计数仍按背包（与游戏内显示一致），不为联动角色额外 +1。
+        # ── 这一行怎么排格子 ──
+        # 按序号顺序拼：001 初始 → 002 羁绊（联动没有立绘就不设这一格）→ 003+ 名皮
+        # → 【背包里有、名单里没有的序号一律补一格「皮肤 00X」】。
+        # 补格子这条是关键：以前只画"名单里有的"，背包里多出来的条目会被计入统计却看不见，
+        # 于是顶部统计与框里亮格数对不上。任何一条都不允许凭空消失。
+        # 联动角色没有羁绊皮肤 ⇒ 名皮紧贴初始皮肤排（002 起）；普通角色 002 是羁绊，名皮从 003 起
+        _base = 2 if collab else 3
+        slots = {1: '初始皮肤'}
+        if not collab:
+            slots[2] = '羁绊皮肤'
         for i, sname in enumerate(names):
-            rows.append({'name': sname, 'has': (3 + i) in has})
+            slots[_base + i] = sname
+        rows = []
+        for _seq in sorted(set(slots) | set(has)):
+            if _seq in slots:
+                rows.append({'name': slots[_seq],
+                             'has': (_seq in has) or (_seq == 1 and collab and owns)})
+            else:
+                rows.append({'name': '皮肤 %03d' % _seq, 'has': True})
         have = sum(1 for r in rows if r['has'])
-        tot_orig += (1 if 1 in has else 0)
-        tot_bond += (1 if 2 in has else 0)
-        tot_buy += len([x for x in has if x >= 3])
+        # 计数严格按「框里亮了几格」来算 ⇒ 顶部统计与列表永远对得上
+        _a = 1 if rows[0]['has'] else 0                              # 初始那一格
+        _b = 1 if (not collab and 2 in has) else 0                    # 羁绊那一格
+        tot_orig += _a
+        tot_bond += _b
+        tot_buy  += have - _a - _b
         n_ctr += (1 if contract else 0)
         out.append({'id': hid, 'name': nm, 'title': v.get('title', ''),
-                    'contract': contract, 'have': have, 'total': len(rows),
-                    'skins': rows})
-    out.sort(key=lambda x: (-x['have'], x['id']))
-    # 游戏内「全部皮肤」= 每角色(初始+羁绊) + Wiki 命名皮肤
-    sk_total = sum(2 + len(v.get('skins') or []) for v in wiki.values())
+                    'contract': contract, 'owns': owns,
+                    'have': have, 'total': len(rows), 'skins': rows})
+    # 已拥有的排前面（按拥有数降序），未拥有的按角色 ID 排在后面
+    out.sort(key=lambda x: (0 if x['owns'] else 1, -x['have'], x['id']))
+    # 游戏内「全部皮肤」= 每角色(初始+羁绊) + Wiki 命名皮肤；联动角色没有羁绊那一格
+    _bl = COLLAB_IDS | _bondless()          # 分母同样用「名单 + 本机立绘证据」
+    sk_total = sum((1 if int(v.get('id') or 0) in _bl else 2) + len(v.get('skins') or [])
+                   for v in wiki.values())
     return {'list': out, 'orig': tot_orig, 'bond': tot_bond, 'buy': tot_buy,
             'contract': n_ctr, 'named': tot_bond + tot_buy,
-            'hero_have': len(out), 'hero_total': len(by_id), 'sk_total': sk_total,
-            'sum': tot_orig + tot_bond + tot_buy}
+            'hero_have': sum(1 for x in out if x['owns']), 'hero_total': len(out),
+            'sk_total': sk_total, 'sum': tot_orig + tot_bond + tot_buy}
 
 
 REVIEW_DIR = DATA_DIR / 'review'
@@ -471,7 +563,7 @@ def get_replay_file(replay_id):
 #   缓存版本：改动复盘数据结构（新增字段）后必须 +1，否则旧缓存会被直接复用，
 #   导致新增字段缺失、功能不生效（例如旧缓存里没有 skin 字段时，
 #   头像会全部回落到初始皮肤）。
-REVIEW_CACHE_VERSION = 2
+REVIEW_CACHE_VERSION = 4
 
 
 def build_review_cached(replay_id):
@@ -488,10 +580,11 @@ def build_review_cached(replay_id):
     from astral.review import build_review
     rv = build_review(get_replay_file(replay_id))
     rv['_v'] = REVIEW_CACHE_VERSION
-    try:
-        cj.write_text(json.dumps(rv, ensure_ascii=False), encoding='utf-8')
-    except Exception:
-        pass
+    if rv.get('players'):                      # 解析不出玩家的局不落缓存，
+        try:                                   # 否则下次会拿空缓存当结果
+            cj.write_text(json.dumps(rv, ensure_ascii=False), encoding='utf-8')
+        except Exception:
+            pass
     return rv
 
 
@@ -804,11 +897,22 @@ def _maps_of(p):
                    for k, v in p.winMap.items()),
                   key=lambda m: -m['n'])
 
+
+def _friendly_err(err):
+    """把底层的握手/超时错误翻译成使用者看得懂的话。"""
+    s = str(err or '')
+    if 'timeout' in s.lower() or '超时' in s:
+        return ('查询超时：游戏服务器把这个请求丢掉了（短时间内查太频繁会被限流）。'
+                '等十几秒再试一次；也可以改用回放号查，回放号那条路不需要登录。')
+    return '查询失败：%s' % s[:110]
+
+
 class Api:
     def __init__(self):
         self.phone = ''
         self.sid = ''
         self.profile = None
+        self._sess = None           # 复用的游戏连接（见 _session）
 
     # ── ① 发验证码 ──
     def send_code(self, phone: str):
@@ -834,6 +938,51 @@ class Api:
             return {'ok': False, 'msg': '刷新失败：%s' % str(e)[:100]}
 
     # ── 按需加载某局的回放复盘数据 ──
+    def maps_of(self, rids):
+        """给一串回放号取地图名（每局只抓 8KB 前缀，并发 5 路，失败回退串行）。"""
+        ids = [str(x) for x in (rids or []) if x]
+        if not ids:
+            return {}
+        _load_map_cache()
+        out = {}
+        try:
+            import concurrent.futures as cf
+            with cf.ThreadPoolExecutor(max_workers=5) as ex:
+                for rid, info in zip(ids, ex.map(fetch_replay_map, ids)):
+                    out[rid] = (info or {}).get('name') or ''
+        except Exception:
+            for rid in ids:
+                try:
+                    out[rid] = (fetch_replay_map(rid) or {}).get('name') or ''
+                except Exception:
+                    out[rid] = ''
+        _save_map_cache()
+        return out
+
+    def diffs_of(self, rids):
+        """给一串回放号取难度（0 普通 / 1 困难 / 2 噩梦 / 3 疯狂 / 4 极限）。
+
+        与 maps_of 共用同一份前缀缓存 ⇒ 同一局不会重复下载。
+        """
+        ids = [str(x) for x in (rids or []) if x]
+        if not ids:
+            return {}
+        _load_map_cache()
+        out = {}
+        try:
+            import concurrent.futures as cf
+            with cf.ThreadPoolExecutor(max_workers=5) as ex:
+                for rid, info in zip(ids, ex.map(fetch_replay_map, ids)):
+                    out[rid] = (info or {}).get('diff')
+        except Exception:
+            for rid in ids:
+                try:
+                    out[rid] = (fetch_replay_map(rid) or {}).get('diff')
+                except Exception:
+                    out[rid] = None
+        _save_map_cache()
+        return out
+
     def match_maps(self):
         """给「最近对局」列表补地图名（每局只抓 8KB，并发 5 路）。"""
         recs = (self.profile or {}).get('recent') or []
@@ -855,7 +1004,8 @@ class Api:
                 if info:
                     out[rid] = info
         _save_map_cache()
-        return {'ok': True, 'maps': out}
+        return {'ok': True, 'maps': out,
+                'diffs': {k: (v or {}).get('diff') for k, v in out.items()}}
 
     def art_status(self):
         """前端轮询：本机游戏美术资源的补全进度（running/text/i/n/done/found/game）。"""
@@ -878,37 +1028,70 @@ class Api:
             pass
         return out
 
-    def load_match(self, idx):
-        """下载并解析第 idx 局的回放，返回 4 名玩家的完整战绩"""
+    # ── 索引 / 回放号 统一解析（复盘查询要用回放号，原「最近对局」用下标）──
+    def _resolve_ref(self, ref):
+        """把「最近对局的下标」或「回放号」统一解析成 (回放号, 该局记录)。
+
+        回放号 = 12 位以上纯数字（如 1790337873289576）；其余当索引处理。
+        索引越界时第二项返回 None，便于调用方区分「没这一局」。
+        """
+        s = str(ref if ref is not None else '').strip()
+        d = re.sub(r'\D', '', s)      # 前端可能传 "'1790…'"（加引号防止 JS 数字精度丢失）
+        if len(d) >= 12:
+            return d, {}
         try:
-            rec = (self.profile or {}).get('recent') or []
-            idx = int(idx)
-            if idx < 0 or idx >= len(rec):
+            idx = int(d)
+        except Exception:
+            return '', None
+        rec = (self.profile or {}).get('recent') or []
+        if idx < 0 or idx >= len(rec):
+            return '', None
+        one = rec[idx] or {}
+        return str(one.get('replayId') or ''), one
+
+    def _my_uid(self):
+        try:
+            return str((self.profile or {}).get('uid') or '')
+        except Exception:
+            return ''
+
+    def load_match(self, ref):
+        """下载并解析某一局的回放，返回 4 名玩家的完整战绩 + 玩家列表。"""
+        try:
+            rid, one = self._resolve_ref(ref)
+            if one is None:
                 return {'ok': False, 'msg': '没有这一局'}
-            rid = rec[idx].get('replayId') or ''
             if not rid:
                 return {'ok': False, 'msg': '这一局没有回放号'}
             st = fetch_replay_stats(rid)
             if not st:
-                return {'ok': False, 'msg': '回放解析不出战绩'}
-            return {'ok': True, 'stats': st}
+                return {'ok': False, 'msg': '回放文件已经损坏，飞魔的问题吧大概'}
+            mine = self._my_uid()
+            players = [{'id': pid, 'name': (v.get('name') or '—'),
+                        'hero': HERO.get(v.get('heroId')) or '',
+                        'me': bool(mine and str(pid) == mine)}
+                       for pid, v in st.items()]
+            out = {'ok': True, 'stats': st, 'players': players, 'replay_id': rid}
+            try:
+                out['map_name'] = (fetch_replay_map(rid) or {}).get('name') or ''
+            except Exception:
+                out['map_name'] = ''
+            return out
         except Exception as e:
             return {'ok': False, 'msg': '拉取失败：%s' % str(e)[:110]}
 
     # ── 对局复盘（点玩家名 → 弹窗）：每轮数据 + 筹码三选一 ──
-    def load_review(self, idx):
+    def load_review(self, ref):
         try:
-            rec = (self.profile or {}).get('recent') or []
-            idx = int(idx)
-            if idx < 0 or idx >= len(rec):
+            rid, one = self._resolve_ref(ref)
+            if one is None:
                 return {'ok': False, 'msg': '没有这一局'}
-            one = rec[idx]
-            rid = str(one.get('replayId') or '')
+            one = one or {}
             if not rid:
-                return {'ok': False, 'msg': '这一局没有回放号'}
+                return {'ok': False, 'msg': '没有回放号'}
             rv = build_review_cached(rid)
             if not rv or not rv.get('players'):
-                return {'ok': False, 'msg': '回放解析不出复盘数据'}
+                return {'ok': False, 'msg': '回放文件已经损坏，飞魔的问题吧大概'}
             try:
                 info = fetch_replay_map(rid) or {}
                 rv['map_name'] = info.get('name') or map_name(rv.get('map_id'))
@@ -933,6 +1116,257 @@ class Api:
             return {'ok': True, 'review': rv}
         except Exception as e:
             return {'ok': False, 'msg': '复盘解析失败：%s' % str(e)[:110]}
+
+    # ── 复制到剪贴板（WebView 里 navigator.clipboard 在 file:// 下不可靠，走原生 Win32）──
+    @staticmethod
+    def copy_text(text):
+        """把文本写进 Windows 剪贴板。
+
+        64 位下必须声明 restype：ctypes 默认按 32 位 int 收返回值，
+        HGLOBAL 句柄会被截断，GlobalLock 直接失败（表现为「内存锁定失败」）。
+        """
+        try:
+            import ctypes
+            s = str(text if text is not None else '')
+            if not s:
+                return {'ok': False, 'msg': '没有可复制的内容'}
+            CF_UNICODETEXT, GMEM_MOVEABLE = 13, 0x0002
+            u, k = ctypes.windll.user32, ctypes.windll.kernel32
+            k.GlobalAlloc.restype = ctypes.c_void_p
+            k.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+            k.GlobalLock.restype = ctypes.c_void_p
+            k.GlobalLock.argtypes = [ctypes.c_void_p]
+            k.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            k.GlobalFree.argtypes = [ctypes.c_void_p]
+            u.SetClipboardData.restype = ctypes.c_void_p
+            u.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+            buf = ctypes.create_unicode_buffer(s)
+            size = ctypes.sizeof(buf)
+            h = k.GlobalAlloc(GMEM_MOVEABLE, size)
+            if not h:
+                return {'ok': False, 'msg': '内存分配失败'}
+            p = k.GlobalLock(h)
+            if not p:
+                k.GlobalFree(h)
+                return {'ok': False, 'msg': '内存锁定失败'}
+            ctypes.memmove(p, buf, size)
+            k.GlobalUnlock(h)
+            if not u.OpenClipboard(None):
+                k.GlobalFree(h)
+                return {'ok': False, 'msg': '剪贴板被占用'}
+            try:
+                u.EmptyClipboard()
+                if not u.SetClipboardData(CF_UNICODETEXT, h):
+                    k.GlobalFree(h)
+                    return {'ok': False, 'msg': '写入剪贴板失败'}
+            finally:
+                u.CloseClipboard()          # 成功后内存归系统所有，不能自己释放
+            return {'ok': True, 'text': s}
+        except Exception as e:
+            return {'ok': False, 'msg': '复制失败：%s' % str(e)[:80]}
+
+    # ── ★ 复盘查询：一个输入框自动识别「回放号 / UID」──
+    @staticmethod
+    def _classify(text):
+        """识别输入文本：('replay', 回放号) / ('uid', UID) / ('', 原样)。"""
+        s = re.sub(r'\D', '', str(text or ''))
+        if not s:
+            return '', ''
+        if len(s) >= 12:                 # 回放号是 16 位长数字
+            return 'replay', s
+        if 4 <= len(s) <= 11:            # UID 是 6~7 位
+            return 'uid', s
+        return '', s
+
+    def _session(self, force_new=False):
+        """拿一条已登录的游戏连接（查 UID 用；回放号那条路不需要登录）。
+
+        必须复用：服务器会把短时间内反复登录的请求静默丢弃（登录握手直接超时、
+        一个包都收不到），每查一次就重新登录的话，连查两次就会全线超时。
+        """
+        if not force_new and self._sess is not None:
+            return self._sess
+        sid, why = _auto()
+        if not sid:
+            raise RuntimeError(why or '登录态不可用，请先用验证码登录一次')
+        c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
+        c.connect()
+        c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
+                      extra=DEFAULT_EXTRA, client_ver='3.2.0')
+        self._sess = c
+        return c
+
+    def _drop_session(self):
+        """丢掉当前连接（连接出错或退出登录时调）。"""
+        c, self._sess = self._sess, None
+        if c is not None:
+            try:
+                c.close()
+            except Exception:
+                pass
+
+    def _self_uid(self):
+        """本机记住的账号 UID（未登录时从 token.json 取，用来识别「查自己」）。"""
+        if self.profile and self.profile.get('uid'):
+            return str(self.profile['uid'])
+        try:
+            # 注意：load_token() 只返回 accessToken 字符串，uid 在 load_token_info() 里
+            t = load_token_info() or {}
+            return str(t.get('uid') or '')
+        except Exception:
+            return ''
+
+    def _query_self(self, uid):
+        """查自己：服务器会丢弃 5153，直接用登录握手包里的档案拼一份结果。
+
+        登录包已含所需的一切：Player.level / showPlayer.record / praiseNum、
+        task.condition[14 = 场次, 13 = 胜场]，所以这条路不用再发任何请求。
+        """
+        prof = self.profile
+        if not prof or str(prof.get('uid')) != str(uid):
+            sid, why = _auto()
+            if not sid:
+                return {'ok': False, 'kind': 'uid', 'uid': uid,
+                        'msg': why or '登录态不可用，请先用验证码登录一次'}
+            prof = self._fetch(sid)
+            self.profile = prof
+        recs = []
+        for r in list(prof.get('recent') or []):
+            rid = str(r.get('replayId') or '')
+            if not rid:
+                continue
+            hid = int(r.get('heroId') or 0)
+            recs.append({'replayId': rid, 'time': int(r.get('time') or 0),
+                         'rank': int(r.get('rank') or 0), 'heroId': hid,
+                         'mapType': int(r.get('mapType') or 0),
+                         'hero': r.get('hero') or HERO.get(hid, '')})
+        try:                                       # 每局地图名 + 难度（只抓前缀，带缓存）
+            rids = [r['replayId'] for r in recs]
+            mp = self.maps_of(rids)
+            df = self.diffs_of(rids)
+            for r in recs:
+                r['map_name'] = mp.get(r['replayId']) or ''
+                r['difficulty'] = df.get(r['replayId'])
+        except Exception:
+            pass
+        return {'ok': True, 'kind': 'uid', 'uid': uid, 'self': True,
+                'nick': prof.get('nick') or '',
+                'level': int(prof.get('level') or 0),
+                'online': True,                    # 刚握手成功，本人此刻必然在线
+                'statistics': {
+                    # 档案里 adorn = 皮肤数(skins.sum)、decor = 装饰数，与 5153 命名相反
+                    'fightCount': int(prof.get('total') or 0),
+                    'winFightCount': int(prof.get('wins') or 0),
+                    'roleCardCount': int(prof.get('heroCount') or 0),
+                    'adornCount': int(prof.get('decor') or 0),
+                    'skinCount': int(prof.get('adorn') or 0),
+                    'praiseNum': int(prof.get('praise') or 0)},
+                'records': recs}
+
+    def query(self, text):
+        """复盘查询：回放号 → 单条对局记录；UID → 最近 10 局记录。"""
+        kind, s = self._classify(text)
+        if not kind:
+            return {'ok': False, 'msg': '请输入回放号（16 位长数字）或 UID（6~7 位数字）'}
+
+        if kind == 'replay':
+            rid = s
+            st = fetch_replay_stats(rid)
+            if not st:
+                return {'ok': False, 'kind': 'replay', 'replay_id': rid,
+                        'msg': '取不到这个回放 —— 回放号可能输错或已过期'}
+            mine = self._my_uid()
+            players = [{'id': pid, 'name': (v.get('name') or '—'),
+                        'hero': HERO.get(v.get('heroId')) or '',
+                        'me': bool(mine and str(pid) == mine)}
+                       for pid, v in st.items()]
+            try:
+                mapname = (fetch_replay_map(rid) or {}).get('name') or ''
+            except Exception:
+                mapname = ''
+            diff = None
+            try:
+                rv = build_review_cached(rid)
+                diff = (rv or {}).get('difficulty')
+            except Exception:
+                pass
+            rec = {'replayId': rid, 'time': 0, 'rank': 0, 'hero': '', 'players': players}
+            return {'ok': True, 'kind': 'replay', 'replay_id': rid, 'map_name': mapname,
+                    'difficulty': diff, 'records': [rec], 'stats': st}
+
+        # kind == 'uid'：需要一条登录会话（回放号那条路不用登录）
+        uid = int(s)
+        if self._self_uid() and str(uid) == self._self_uid():
+            # 「查自己」会被服务器丢弃 5153（见 _fetch 里的注释）。登录与否都一样，
+            # 因为这条查询本身就用本机记住的票登录，服务器看到的会话 uid 就是你自己。
+            # ⇒ 不发 5153，直接用登录握手包里的档案作答。
+            return self._query_self(uid)
+        sp, last = None, ''
+        for attempt in (1, 2):
+            try:
+                c = self._session(force_new=(attempt > 1))
+                sp = c.get_show_player(uid, timeout=15.0)
+                break
+            except Exception as e:
+                last = str(e)
+                self._drop_session()            # 这条连接不能用了，下次重建
+                if attempt == 1:
+                    time.sleep(1.6)             # 被限流时留点间隔再试一次
+        if sp is None:
+            return {'ok': False, 'kind': 'uid', 'uid': uid,
+                    'msg': _friendly_err(last)}
+        try:
+            sd = sp.showData
+            stt = sd.statistics
+            recs = []
+            for r in (sd.record or []):
+                hid = int(getattr(r, 'heroId', 0) or 0)
+                recs.append({'replayId': str(getattr(r, 'replayId', '') or ''),
+                             'time': int(getattr(r, 'time', 0) or 0),
+                             'rank': int(getattr(r, 'rank', 0) or 0),
+                             'heroId': hid,
+                             'mapType': int(getattr(r, 'mapType', 0) or 0),
+                             'hero': HERO.get(hid) or ''})
+            recs = [r for r in recs if r['replayId']]
+            recs.sort(key=lambda x: x['time'] or 0, reverse=True)
+            try:                                   # 每局地图名 + 难度（只抓前缀，带缓存）
+                rids = [r['replayId'] for r in recs]
+                mp = self.maps_of(rids)
+                df = self.diffs_of(rids)
+                for r in recs:
+                    r['map_name'] = mp.get(r['replayId']) or ''
+                    r['difficulty'] = df.get(r['replayId'])
+            except Exception:
+                pass
+            statistics = {
+                'fightCount': int(getattr(stt, 'fightCount', 0) or 0),
+                'winFightCount': int(getattr(stt, 'winFightCount', 0) or 0),
+                'roleCardCount': int(getattr(stt, 'roleCardCount', 0) or 0),
+                'adornCount': int(getattr(stt, 'adornCount', 0) or 0),
+                'skinCount': int(getattr(stt, 'skinCount', 0) or 0),
+                'useHero': int(getattr(stt, 'useHero', 0) or 0),
+                'praiseNum': int(getattr(sd, 'praiseNum', 0) or 0),
+            }
+            out = {'ok': True, 'kind': 'uid', 'uid': uid, 'nick': '',
+                   'level': 0, 'online': False, 'statistics': statistics,
+                   'records': recs}
+            try:                                   # 简况（昵称/等级/在线）拿不到也不影响主流程
+                ps = c.get_player_simple(uid, timeout=15.0)
+                pi = ps.PlayerInfo
+                out['nick'] = str(getattr(pi, 'name', '') or '')
+                out['level'] = int(getattr(pi, 'lv', 0) or 0)
+                out['online'] = bool(getattr(pi, 'isOnline', False))
+            except Exception:
+                pass
+            return out
+        except Exception as e:
+            return {'ok': False, 'kind': 'uid', 'uid': uid,
+                    'msg': '解析失败：%s' % str(e)[:120]}
+        finally:
+            try:
+                c.close()
+            except Exception:
+                pass
 
     # ── ② 登录 + 拉档案 ──
     def auto_login(self):
@@ -977,6 +1411,7 @@ class Api:
         """
         self.profile = None
         self.sid = None
+        self._drop_session()
         try:
             (DATA_DIR / 'sid.txt').unlink(missing_ok=True)
         except Exception:
@@ -987,6 +1422,7 @@ class Api:
         """彻底清除本机记住的登录态（token.json）。"""
         self.profile = None
         self.sid = None
+        self._drop_session()
         try:
             clear_token()
         except Exception:
@@ -1033,9 +1469,11 @@ class Api:
         return {'ok': True, 'msg': '✓ 登录成功，档案已生成', 'profile': self.profile}
 
     def _fetch(self, sid):
-        """登录握手 → 档案字典。"""
+        """登录握手 → 档案字典（登录成功后连接留着，给复盘查询复用）。"""
+        self._drop_session()        # 换新连接前先把旧的关掉
         c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
         c.connect()
+        ok = False
         try:
             s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
                                 extra=DEFAULT_EXTRA, client_ver='3.2.0')
@@ -1062,6 +1500,8 @@ class Api:
             _bagids = [int(getattr(x, 'item_id', 0)) for x in (getattr(p, 'bag_items', []) or [])]
             decor = len([i for i in _bagids if 70000 <= i < 77000])   # 装饰（备用）
 
+            self._sess = c          # 留给复盘查询复用：短时间内再登一次会被服务器丢包
+            ok = True
             return {'nick': getattr(p, 'nick', '?'), 'uid': getattr(p, 'id', '?'),
                     'platform': (getattr(p, 'platform', '')
                                  or getattr(s2c, 'platform', '') or 'CN_STEAM'),
@@ -1069,6 +1509,7 @@ class Api:
                     'total': total, 'wins': wins,
                     'winrate': round(100.0 * wins / total, 1) if total else 0,
                     'heroCount': len(p.roleCard), 'praise': praise,
+                    'level': int(getattr(p, 'level', 0) or 0),
                     'adorn': adorn, 'decor': decor,
                     'heroes': _heroes_of(p), 'skins': skins, 'maps': _maps_of(p),
                     # 必须与界面一样按从新到旧排序：界面点第 i 行会调 load_match(i)，
@@ -1077,7 +1518,11 @@ class Api:
                                      key=lambda x: int(x.get('time') or 0),
                                      reverse=True)}
         finally:
-            c.close()
+            if not ok:              # 只有失败才关：成功那条留着给复盘查询复用
+                try:
+                    c.close()
+                except Exception:
+                    pass
 
     # ── ③ 导出 ──
     def export_text(self, with_matches=False):
@@ -1221,6 +1666,65 @@ def _selftest_helpers():
     sk = _skins_of(p)
     if isinstance(sk, dict) and 'sum' not in sk:
         bad.append('皮肤清单缺少 sum 字段')
+
+    # 复盘查询的输入识别（纯函数；判定错了「回放号/UID」就整个查不动）
+    for txt, want_kind, want_num in (
+            ('1790337873289576', 'replay', '1790337873289576'),
+            ("'1790337873289576'", 'replay', '1790337873289576'),   # 前端加引号防 JS 精度丢失
+            ('1007622', 'uid', '1007622'),
+            ('  1007622 ', 'uid', '1007622'),
+            ('', '', ''),
+            ('123', '', '123')):
+        k, n = Api._classify(txt)
+        if (k, n) != (want_kind, want_num):
+            bad.append('查询输入识别 %r → (%r, %r)，应为 (%r, %r)'
+                       % (txt, k, n, want_kind, want_num))
+
+    # 会话复用：每查一次就重新登录，服务器会把请求静默丢掉（真实故障）
+    class _FakeCli:
+        closed = 0
+
+        def connect(self):
+            pass
+
+        def login_china(self, *a, **k):
+            pass
+
+        def close(self):
+            _FakeCli.closed += 1
+
+    global _auto, load_token_info
+    real_cli, real_auto = C.AstralClient, _auto
+    real_ti = load_token_info
+    try:
+        C.AstralClient = lambda *a, **k: _FakeCli()
+        _auto = lambda: ('自检-sid', '')
+        api = Api()
+        if api._session() is not api._session():
+            bad.append('游戏连接没有复用：连查两次会各登录一次，会被服务器限流')
+        api._drop_session()
+        if _FakeCli.closed != 1:
+            bad.append('_drop_session 没有关掉旧连接')
+
+        # 「查自己」的识别必须*未登录*也生效：uid 存在 token.json 的 uid 字段，
+        # 而 load_token() 只返回 accessToken 字符串，用错函数就会认不出自己
+        load_token_info = lambda: {'accessToken': '自检', 'uid': 123456, 'nick': '自检'}
+        api2 = Api()
+        if api2._self_uid() != '123456':
+            bad.append('未登录时读不到本机记住的 uid ⇒ 认不出「查自己」')
+        api2.profile = {'uid': 123456, 'nick': '自检', 'level': 9, 'total': 10, 'wins': 5,
+                        'heroCount': 3, 'praise': 7, 'adorn': 4, 'decor': 2,
+                        'skins': {'sum': 4}, 'recent': []}
+        r = api2.query('123456')
+        st = (r or {}).get('statistics') or {}
+        if not (r or {}).get('ok') or st.get('skinCount') != 4 or st.get('fightCount') != 10:
+            bad.append('「查自己」没走本地档案或字段对不上：%r'
+                       % ((r or {}).get('msg') or st,))
+    except Exception as e:
+        bad.append('会话/自查自检异常：%r' % (e,))
+    finally:
+        C.AstralClient, _auto = real_cli, real_auto
+        load_token_info = real_ti
     return bad
 
 

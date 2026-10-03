@@ -379,6 +379,7 @@ def build_review(src, replay_id=None):
             'hero_id': info['hero_id'],
             'skin': info.get('skin', 0),
             'slot': info['slot'],
+            'level': info.get('level', 0),
             'rounds': rows,
             'totals': total,
             'chip_events': events,
@@ -386,6 +387,20 @@ def build_review(src, replay_id=None):
                        'round': e['round'], 'source': e['source']} for e in events],
         })
     players.sort(key=lambda p: p['slot'])
+    # 难度与地图：取自 Room 帧（#48 difficulty、#63 mapDifficultyId —— 后者是地图表 ID，
+    # 比「回放前 300 字节推测地图」可靠，且离线可读）
+    difficulty, map_diff_id = 0, 0
+    try:
+        for f in (rp.frames or []):
+            room = f.get('room') if hasattr(f, 'get') else None
+            if room is None:
+                continue
+            difficulty = int(getattr(room, 'difficulty', 0) or 0)
+            map_diff_id = int(getattr(room, 'mapDifficultyId', 0) or 0)
+            if difficulty or map_diff_id:
+                break
+    except Exception:
+        pass
     # 任务完成情况（每帧取最后一次状态）
     missions = {}
     for st in reversed(rp.mission_states()):
@@ -393,7 +408,9 @@ def build_review(src, replay_id=None):
             missions.setdefault(mid, state)
     return {
         'replay_id': rp.replay_id,
-        'map_id': rp.map_id,
+        'map_id': rp.map_id or map_diff_id or None,
+        'map_difficulty_id': map_diff_id,
+        'difficulty': difficulty,
         'frames': rp.frame_count,
         'packets': len(rp.packets),
         'rounds': rp.round_count(),

@@ -183,12 +183,41 @@
   .rvhead .rhtxt{ display:flex; flex-direction:column; gap:3px; min-width:0; }
   .rvhead .rav{ width:58px; height:58px; border-radius:50%; object-fit:contain; flex:0 0 58px;
                 background:transparent; align-self:center; display:none; }
-  .rvhead .ruid{ font-size:11.5px; color:#A79F91; letter-spacing:.3px; }
+  .rhuid{ display:flex; align-items:center; gap:9px; }
+  .rvhead .ruid{ font-size:11.5px; color:#A79F91; letter-spacing:.3px; cursor:pointer; }
+  .rvhead .ruid:hover{ color:#B4633A; }
+  .qcp{ display:inline-flex; align-items:center; justify-content:center; width:19px; height:18px;
+        flex:0 0 auto; vertical-align:-3.5px; border:1px solid #DDD3BF; border-radius:6px;
+        color:#8C8270; cursor:pointer; }
+  .qcp:hover{ border-color:#B4633A; color:#B4633A; background:#FBF6EE; }
+  /* 复制成功的小提示：从锚点上方跳一下，然后慢慢淡掉 */
+  .qtoast{ position:fixed; z-index:9999; pointer-events:none; font-size:12px; color:#fff;
+           background:#B4633A; padding:3px 10px; border-radius:9px; white-space:nowrap;
+           box-shadow:0 4px 14px rgba(150,90,50,.28); animation:qpop 1.15s ease-out forwards; }
+  @keyframes qpop{
+    0%  { opacity:0; transform:translateY(4px) scale(.92); }
+    16% { opacity:1; transform:translateY(-7px) scale(1); }
+    68% { opacity:1; transform:translateY(-10px) scale(1); }
+    100%{ opacity:0; transform:translateY(-22px) scale(.97); }
+  }
+  /* 复盘查询 · 玩家简况：单行紧凑，避免大白框里只放两行字 */
+  .qme{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+        padding:7px 12px; background:#fff; border-radius:9px; margin:0 0 10px; }
+  .qme>b{ font-size:15px; color:#3F3A2E; }
+  .qme .quid{ font-size:12px; color:#A79F91; cursor:pointer; }
+  .qme .quid b{ color:#6E6656; font-weight:600; }
+  .qme .quid:hover b{ color:#B4633A; }
+  .qme .quid .qcp{ margin-left:8px; }
+  .qme .qsub{ font-size:12px; color:var(--dim); }
+  .qme .qsub b{ color:#3F3A2E; font-weight:600; }
   .rvhead .rn{ font-size:16px; font-weight:700; color:#3F3A2E; }
   .rvhead .rh{ font-size:12px; color:var(--dim); display:flex; align-items:baseline;
                gap:3px; flex-wrap:wrap; }
   .rvhead .rh .rhero{ color:#3F3A2E; font-weight:600; }
   .rvhead .rh .rsplit{ color:#C4BAA6; font-size:11px; }
+  /* 名字后面的等级 Lv.xx：比名字弱一档，不抢主体 */
+  .rvhead .rn .rlv{ font-style:normal; font-size:12px; font-weight:500;
+                    color:#A79F91; margin-left:5px; letter-spacing:.2px; }
   .rvhead .rx{ margin-left:auto; cursor:pointer; color:#A79F91; font-size:15px;
                padding:2px 8px; border-radius:7px; }
   .rvhead .rx:hover{ background:#EDE7DA; color:var(--ink); }
@@ -252,7 +281,7 @@
 
   .match{ border-bottom:1px solid #F2EFE7; }
   .match:last-child{ border-bottom:0; }
-  .mhead{ display:grid; grid-template-columns:118px 112px 44px auto 20px; gap:5px;
+  .mhead{ display:grid; grid-template-columns:118px 150px 44px auto 20px; gap:5px;
           align-items:center; padding:11px 6px; cursor:pointer; border-radius:8px;
           transition:.12s; }
   .mhead:hover{ background:#FAF8F3; }
@@ -261,10 +290,24 @@
   .mhead .h{ display:flex; align-items:center; gap:7px; font-weight:600; }
   .mhead .res{ font-size:12px; font-weight:600; text-align:left; }
   .mhead .res.win{ color:var(--ok); } .mhead .res.lose{ color:var(--accent); }
-  .mhead .m{ justify-self:start; display:inline-block; padding:1px 8px; font-size:11px; color:#A79A82;
+  .mhead .m{ justify-self:start; display:inline-flex; align-items:stretch; overflow:hidden;
+             padding:0 0 0 8px; font-size:11px; line-height:17px; color:#A79A82;
              background:#F1EDE2; border-radius:6px; white-space:nowrap; }
   .mhead .m.got{ color:#7B6440; background:#EFE7D4; }
   .mhead .m.none{ color:#B7AE9C; background:#F1EDE2; }
+  /* 难度标：无边框、和地图框同款的色块 */
+  .dh{ display:inline-block; margin-left:3px; margin-right:0; padding:1px 6px;
+       border:0; border-radius:4px; font-size:11px; line-height:15px;
+       vertical-align:baseline; white-space:nowrap; }
+  .dh0{ color:#5F7355; background:#E7EDE1; }
+  .dh1{ color:#3E6088; background:#E3EAF4; }
+  .dh2{ color:#6A4C93; background:#EBE5F5; }
+  .dh3{ color:#A24E2B; background:#F7E6DD; }
+  .dh4{ color:#8C2A2A; background:#F6DEDE; }
+  /* 在地图框里时：撑满整高（上下边与地图框重合）+ 顶到右边缘（地图框右侧无内边距）
+     ⇒ 四边由 flex 布局保证，圆角交给地图框的 overflow:hidden 裁 */
+  .mhead .m .dh{ display:flex; align-items:center; margin:0 0 0 3px; padding:0 6px;
+                 line-height:17px; border-radius:0; }
   .mhead .arw{ color:#C4BCAC; font-size:10px; transition:.2s; }
   .match.open .arw{ transform:rotate(90deg); }
   .mbody{ display:none; padding:2px 6px 14px 114px; }
@@ -279,6 +322,25 @@
   .empty{ color:var(--dim); font-size:12.5px; padding:20px 0; text-align:center; }
   .skrow{padding:10px 0;border-bottom:1px solid #E7E1D3}
   #skinList .skrow:first-child{ padding-top:0; }     /* 去掉首行上方多余留白 */
+  /* 未拥有的角色也列出来，整体压暗一档（和「拥有角色但皮肤没买」区分开）*/
+  .skrow.noh .skhead b{ color:#A79F91; }
+  .skrow.noh .skhead em{ color:#BFB7A5; }
+  .skrow.noh .chips .chip{ opacity:.5; }
+  /* ── 排序小图标按钮（内联 SVG，无 emoji） ── */
+  .sbtn{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
+         margin-left:4px; vertical-align:-0.5px; border-radius:4px; cursor:pointer; color:#BEB29A;
+         transition:background .12s,color .12s; }
+  .sbtn:hover{ background:#EDE7DA; color:#B4633A; }
+  .sbtn.on{ color:#B4633A; }
+  .sbtn.big{ width:19px; height:19px; margin-left:2px; }
+  .sbtn svg{ width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:1.5;
+             stroke-linecap:round; stroke-linejoin:round; }
+  .sbtn.big svg{ width:13px; height:13px; }
+  .srow{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; font-size:12px; color:var(--dim); }
+  .stabs{ display:inline-flex; gap:2px; background:#EDE7DA; padding:2px; border-radius:8px; }
+  .stab{ padding:2px 9px; border-radius:6px; cursor:pointer; color:#8C8270; font-style:normal; }
+  .stab:hover{ color:#B4633A; }
+  .stab.on{ background:#FFFDF8; color:#B4633A; box-shadow:0 1px 2px rgba(0,0,0,.06); }
   #p-skin h2{ margin-bottom:2px; }
   #p-skin .sub{ margin-bottom:6px; }
   #p-skin .box{ padding-top:8px; }
@@ -314,7 +376,7 @@
     <div class="rvhead">
       <img class="rav" id="rvAv" alt="" />
       <div class="rhtxt">
-        <div class="ruid" id="rvUid"></div>
+        <div class="rhuid"><div class="ruid" id="rvUid" title="点击复制 UID"></div><i class="qcp" id="rvCp" title="复制 UID" onclick="qCopyUid(this)"></i></div>
         <div class="rn" id="rvName">—</div>
         <div class="rh" id="rvSub"></div>
       </div>
@@ -334,6 +396,7 @@
     <div class="nav on" data-p="login" id="navLogin">登录</div>
     <div class="nav lock" id="navProfile" data-p="profile">我的信息</div>
     <div class="nav lock" id="navMatch" data-p="match">最近对局</div>
+    <div class="nav" id="navQuery" data-p="query">复盘查询</div>
     <div class="nav lock" id="navSkin" data-p="skin">我的皮肤</div>
     <div class="nav lock" id="navExport" data-p="export">档案导出</div>
     <div id="who">
@@ -372,8 +435,11 @@
           <colgroup><col style="width:40%"><col style="width:12%"><col style="width:12%">
                     <col style="width:12%"><col style="width:11%"><col style="width:13%"></colgroup>
           <thead><tr>
-            <th>角色</th><th class="num">场次</th><th class="num">胜场</th>
-            <th class="num">胜率</th><th class="num">等级</th><th class="num">潜能</th>
+            <th>角色<i class="sbtn" id="sbn_name" onclick="hSort('name')" title="按角色编号 / 恢复默认（场次从高到低）"></i></th>
+            <th class="num">场次<i class="sbtn" id="sbn_n" onclick="hSort('n')" title="场次从高到低 / 恢复默认"></i></th>
+            <th class="num">胜场<i class="sbtn" id="sbn_w" onclick="hSort('w')" title="按胜场排序（降序→升序→默认）"></i></th>
+            <th class="num">胜率<i class="sbtn" id="sbn_rate" onclick="hSort('rate')" title="按胜率排序（降序→升序→默认）"></i></th>
+            <th class="num">等级</th><th class="num">潜能</th>
           </tr></thead>
           <tbody id="heroes"></tbody>
         </table>
@@ -393,9 +459,29 @@
       <div class="box" id="matchBox"></div>
     </div>
 
+    <div class="pane" id="p-query">
+      <h2>复盘查询</h2>
+      <div class="sub" style="margin-top:7px">输入 UID 显示该玩家最近十局对局，输入回放号显示对应单条对局</div>
+      <div class="row" style="margin-top:14px">
+        <input id="qin" placeholder="UID或回放号（自动识别）" maxlength="24"
+               onkeydown="if(event.key==='Enter') doQuery()">
+        <button id="qbtn" onclick="doQuery()">查 询</button>
+      </div>
+      <div class="savemsg" id="qmsg"></div>
+      <div id="qbox"></div>
+    </div>
+
     <div class="pane" id="p-skin">
       <h2>我的皮肤</h2>
       <div class="sub" id="skinSub">按角色列出 · 彩色为已拥有，灰色为未拥有</div>
+      <div class="srow">
+        <span class="stabs">
+          <i class="stab on" id="skb_id" onclick="skSort('id')">角色编号</i>
+          <i class="stab" id="skb_have" onclick="skSort('have')">已拥有换装</i>
+          <i class="stab" id="skb_total" onclick="skSort('total')">角色换装数</i>
+        </span>
+        <i class="sbtn big" id="skb_dir" onclick="skDir()" title="升序 / 降序"></i>
+      </div>
       <div class="box"><div id="skinList"></div></div>
     </div>
 
@@ -429,6 +515,41 @@ function fmtTime(ts){
   const p = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+window.renderStats = (r, st, mi) => {
+  const esc = window.__esc;
+  const ps = r.players || [];
+  const S = p => (st[String(p.id)] || {}).stats || {};
+  const kk = '击杀';                                // 后端已换算成官方口径（含怪物/盗贼）
+  const cols = [kk, '伤害', '承伤', '死亡', '治疗', '星币', '转账', '步数'];
+  const LAB = {};
+  // 每列最大值（>0 才强调，全 0 不高亮）
+  const best = {};
+  cols.forEach(k => { best[k] = Math.max(0, ...ps.map(p => S(p)[k] || 0)); });
+
+  const rows = ps.map(p => {
+    const s = S(p);
+    const c = k => {
+      const v = s[k] || 0;
+      const isTop = best[k] > 0 && v === best[k];
+      const amber = (k === '星币');
+      return `<div class="n${amber?' hi':''}${isTop?' top':''}">${v}</div>`;
+    };
+    return `<div class="pl${p.me?' me':''}">
+      <div class="nm" onclick="openReview(${mi}, '${p.id}')" title="点击查看 TA 的对局复盘"><span class="nmt">${esc(p.name)}</span>${p.me?'<em>我</em>':''}<i class="nmgo">▸</i></div>
+      <div class="hr"><b>${p.hero}</b></div>
+      ${cols.map(c).join('')}
+    </div>`;
+  }).join('');
+
+  const head = `<div class="plhead"><div>玩家</div><div>角色</div>
+      ${cols.map(k=>`<div class="n">${LAB[k]||k}</div>`).join('')}</div>`;
+  const sum = k => ps.reduce((a,p)=>a+(S(p)[k]||0), 0);
+  return `<div class="mtab">${head}${rows}</div>
+    <div class="mnote"><span>总${LAB[kk]||kk} <b>${sum(kk)}</b>　总伤害 <b>${sum('伤害')}</b>
+      　总承伤 <b>${sum('承伤')}</b>　总星币 <b>${sum('星币')}</b></span></div>`;
+};
+
 
 async function sendCode(){
   const p = $('#phone').value.trim();
@@ -546,10 +667,11 @@ async function doLogout(){
   try{ await window.pywebview.api.logout(); }catch(e){}
   // 手动复位回登录页（比 location.reload 稳）
   document.querySelectorAll('.nav').forEach(e=>{
-    e.classList.toggle('lock', e.dataset.p !== 'login'); });
+    e.classList.toggle('lock', e.dataset.p !== 'login' && e.dataset.p !== 'query'); });
   const nl=document.getElementById('navLogin'); if(nl) nl.style.display='';
   const lo=document.getElementById('btnLogout'); if(lo) lo.style.display='none';
   window.__recs = [];
+  qReset();                       // 上次的查询结果不该留到下次登录
   ['heroes','maps','cards','matchBox','skinList'].forEach(id=>{
     const e=document.getElementById(id); if(e) e.innerHTML=''; });
   const nk=document.getElementById('nick'); if(nk) nk.textContent='　';
@@ -596,7 +718,7 @@ window.addEventListener('pywebviewready', ()=>setTimeout(()=>boot(true), 120));
 window.addEventListener('pywebviewready', ()=>setTimeout(artPoll, 300));
 function unlock(){
   const _ns=document.getElementById('navSkin'); if(_ns) _ns.classList.remove('lock');
-  ['navProfile','navMatch','navExport'].forEach(id=>$('#'+id).classList.remove('lock'));
+  ['navProfile','navMatch','navExport','navQuery'].forEach(id=>$('#'+id).classList.remove('lock'));
 }
 async function doLogin(){
   const p=$('#phone').value.trim(), c=$('#code').value.trim();
@@ -609,6 +731,84 @@ async function doLogin(){
   say(r.msg,'ok'); afterLogin(r.profile);
 }
 
+// ═══ 排序 ═══
+// 图标一律内联 SVG（界面里不用 emoji）
+const SICON = {
+  desc: '<svg viewBox="0 0 12 12"><path d="M6 1.8v7.1M3.3 6.2 6 8.9l2.7-2.7"/></svg>',
+  asc:  '<svg viewBox="0 0 12 12"><path d="M6 10.2V3.1M3.3 5.8 6 3.1l2.7 2.7"/></svg>',
+  off:  '<svg viewBox="0 0 12 12"><path d="M3.9 4.3 6 2.2l2.1 2.1M3.9 7.7 6 9.8l2.1-2.1"/></svg>',
+};
+function sbtnPaint(id, state){          // state: desc | asc | off
+  const el = document.getElementById(id); if(!el) return;
+  const big = el.classList.contains('big');
+  el.innerHTML = SICON[state] || SICON.off;
+  el.className = 'sbtn' + (big ? ' big' : '') + (state === 'off' ? '' : ' on');
+}
+// ── 我的信息：角色使用排行 ──
+const HSORT_DEF = {key:'n', dir:'desc'};      // 默认排序：场次从高到低
+const HSORT_CYCLE = {                          // 每列点击循环，null = 回到默认
+  name: [{key:'id', dir:'asc'}, {key:'id', dir:'desc'}, null],
+  n:    [{key:'n', dir:'desc'}, {key:'n', dir:'asc'}, null],
+  w:    [{key:'w', dir:'desc'}, {key:'w', dir:'asc'}, null],
+  rate: [{key:'rate', dir:'desc'}, {key:'rate', dir:'asc'}, null],
+};
+window.__hSort = Object.assign({}, HSORT_DEF);
+function heroVal(h, key){
+  if(key === 'id')   return Number(h.id) || 0;
+  if(key === 'w')    return Number(h.w) || 0;
+  if(key === 'rate') return h.n ? (Number(h.w) || 0) / h.n : -1;
+  return Number(h.n) || 0;
+}
+window.hSort = col => {
+  const cyc = HSORT_CYCLE[col] || [];
+  const s = window.__hSort;
+  const hit = cyc.findIndex(o => o && o.key === s.key && o.dir === s.dir);
+  const nxt = cyc[(hit + 1) % cyc.length];     // hit = -1 时正好从第一个开始
+  window.__hSort = nxt ? Object.assign({}, nxt) : Object.assign({}, HSORT_DEF);
+  window.paintHeroes();
+};
+window.paintHeroes = () => {
+  const d = window.__profile; if(!d || !d.heroes) return;
+  const s = window.__hSort || HSORT_DEF;
+  const rows = d.heroes.slice().sort((a,b) =>
+    ((s.dir === 'asc' ? 1 : -1) * (heroVal(a, s.key) - heroVal(b, s.key)))
+    || ((Number(b.n) || 0) - (Number(a.n) || 0))          // 并列时：场次从多到少
+    || ((Number(a.id) || 0) - (Number(b.id) || 0)));      // 再并列：按编号，保证顺序稳定
+  const max = Math.max(...rows.map(h => h.n), 1);
+  document.getElementById('heroes').innerHTML = rows.map(h=>`<tr>
+      <td>
+        <div class="hero-name">
+          ${avOf(h.id) ? `<img class="hav" alt="" src="${avOf(h.id)}">` : '<span class="hav"></span>'}
+          <div class="hbody">
+            <div class="htop"><b>${h.name}</b>${h.title?`<i>${h.title}</i>`:''}</div>
+            <div class="bar"><i style="width:${100*h.n/max}%"></i></div>
+          </div>
+        </div>
+      </td>
+      <td class="num">${h.n||'—'}</td>
+      <td class="num">${h.w||'—'}</td>
+      <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}</td>
+      <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
+      <td class="num">${h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>')}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
+  sbtnPaint('sbn_name', s.key === 'id' ? 'asc' : 'off');
+  sbtnPaint('sbn_n',    s.key === 'n'  ? (s.dir === 'asc' ? 'asc' : 'desc') : 'off');
+  sbtnPaint('sbn_w',    s.key === 'w'  ? (s.dir === 'asc' ? 'asc' : 'desc') : 'off');
+  sbtnPaint('sbn_rate', s.key === 'rate' ? (s.dir === 'asc' ? 'asc' : 'desc') : 'off');
+};
+// ── 我的皮肤 ──
+window.__skSort = {key:'id', dir:'asc'};      // 默认：按角色编号
+window.skSort = key => {
+  const s = window.__skSort;
+  if(s.key === key) s.dir = (s.dir === 'asc' ? 'desc' : 'asc');     // 再点同一项 ⇒ 翻方向
+  else window.__skSort = {key:key, dir: key === 'id' ? 'asc' : 'desc'};
+  renderSkins(window.__profile || {});
+};
+window.skDir = () => {
+  const s = window.__skSort;
+  s.dir = (s.dir === 'asc' ? 'desc' : 'asc');
+  renderSkins(window.__profile || {});
+};
 function renderSkins(d){
   const sk = d.skins || {list:[],named:0,bond:0,sum:0};
   const el = document.getElementById('skinSub');
@@ -616,11 +816,22 @@ function renderSkins(d){
   const box = document.getElementById('skinList');
   if(!box) return;
   if(!sk.list || !sk.list.length){ box.innerHTML = '<div class="empty">没有读到皮肤数据</div>'; return; }
-  box.innerHTML = sk.list.map(h=>
-    `<div class="skrow">
+  const s = window.__skSort || {key:'id', dir:'asc'};
+  const kk = (s.key === 'have' || s.key === 'total') ? s.key : 'id';
+  const val = h => (kk === 'id' ? (Number(h.id) || 0) : (Number(h[kk]) || 0));
+  const rows = sk.list.slice().sort((a,b) =>
+    ((s.dir === 'asc' ? 1 : -1) * (val(a) - val(b)))
+    || ((Number(a.id) || 0) - (Number(b.id) || 0)));
+  box.innerHTML = rows.map(h=>
+    `<div class="skrow${h.owns===false?' noh':''}">
       <div class="skhead"><b>${h.name}</b><i>${h.title||''}</i>${h.contract?'<u class="ctr">已婚</u>':''}<em>${h.have}/${h.total}</em></div>
       <div class="chips">${h.skins.map(x=>`<span class="chip${x.has?' on':''}">${x.name}</span>`).join('') || '<span class="empty">（Wiki 无记录）</span>'}</div>
     </div>`).join('');
+  ['id','have','total'].forEach(k => {
+    const t = document.getElementById('skb_' + k);
+    if(t) t.className = 'stab' + (s.key === k ? ' on' : '');
+  });
+  sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
 function render(d){
   window.__profile = d;                       // 记住当前档案：补到头像新图后要重渲染（见 artPoll）
@@ -639,23 +850,7 @@ function render(d){
     `<div class="card"><div class="k">${k}</div><div class="v">${v}<small>${u}</small></div></div>`
   ).join('');
 
-  const max = Math.max(...d.heroes.map(h=>h.n), 1);
-  $('#heroes').innerHTML = d.heroes.map(h=>`<tr>
-      <td>
-        <div class="hero-name">
-          ${avOf(h.id) ? `<img class="hav" alt="" src="${avOf(h.id)}">` : '<span class="hav"></span>'}
-          <div class="hbody">
-            <div class="htop"><b>${h.name}</b>${h.title?`<i>${h.title}</i>`:''}</div>
-            <div class="bar"><i style="width:${100*h.n/max}%"></i></div>
-          </div>
-        </div>
-      </td>
-      <td class="num">${h.n||'—'}</td>
-      <td class="num">${h.w||'—'}</td>
-      <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}</td>
-      <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
-      <td class="num">${h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>')}</td>
-    </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
+  window.paintHeroes();                       // 角色使用排行（默认场次从高到低，表头可排序）
 
   const mmax = Math.max(...d.maps.map(m=>m.n), 1);
   $('#maps').innerHTML = d.maps.map(m=>`<tr>
@@ -688,7 +883,11 @@ function render(d){
         const el = document.getElementById('map' + i);
         if(!el) return;
         const info = mp[String(rec.replayId)];
-        if(info && info.name){ el.textContent = info.name; el.classList.add('got'); }
+        const df = ((r && r.diffs) || {})[String(rec.replayId)];
+        if(info && info.name){
+          el.innerHTML = window.__esc(info.name) + dChip(df);   // 地图 + 难度标
+          el.classList.add('got');
+        }
         else { el.textContent = '未知地图'; el.classList.add('none'); }
       });
     }catch(e){
@@ -721,40 +920,6 @@ function render(d){
       body.innerHTML = '<div class="mload">✗ ' + window.__esc(e) + '</div>';
       body.dataset.loaded = '';
     }
-  };
-
-  window.renderStats = (r, st, mi) => {
-    const esc = window.__esc;
-    const ps = r.players || [];
-    const S = p => (st[String(p.id)] || {}).stats || {};
-    const kk = '击杀';                                // 后端已换算成官方口径（含怪物/盗贼）
-    const cols = [kk, '伤害', '承伤', '死亡', '治疗', '星币', '转账', '步数'];
-    const LAB = {};
-    // 每列最大值（>0 才强调，全 0 不高亮）
-    const best = {};
-    cols.forEach(k => { best[k] = Math.max(0, ...ps.map(p => S(p)[k] || 0)); });
-
-    const rows = ps.map(p => {
-      const s = S(p);
-      const c = k => {
-        const v = s[k] || 0;
-        const isTop = best[k] > 0 && v === best[k];
-        const amber = (k === '星币');
-        return `<div class="n${amber?' hi':''}${isTop?' top':''}">${v}</div>`;
-      };
-      return `<div class="pl${p.me?' me':''}">
-        <div class="nm" onclick="openReview(${mi}, '${p.id}')" title="点击查看 TA 的对局复盘"><span class="nmt">${esc(p.name)}</span>${p.me?'<em>我</em>':''}<i class="nmgo">▸</i></div>
-        <div class="hr"><b>${p.hero}</b></div>
-        ${cols.map(c).join('')}
-      </div>`;
-    }).join('');
-
-    const head = `<div class="plhead"><div>玩家</div><div>角色</div>
-        ${cols.map(k=>`<div class="n">${LAB[k]||k}</div>`).join('')}</div>`;
-    const sum = k => ps.reduce((a,p)=>a+(S(p)[k]||0), 0);
-    return `<div class="mtab">${head}${rows}</div>
-      <div class="mnote"><span>总${LAB[kk]||kk} <b>${sum(kk)}</b>　总伤害 <b>${sum('伤害')}</b>
-        　总承伤 <b>${sum('承伤')}</b>　总星币 <b>${sum('星币')}</b></span></div>`;
   };
 
   // ── ★ 对局复盘弹窗（点玩家名）──
@@ -799,13 +964,18 @@ function render(d){
       return;
     }
     const t = p.totals || {};
-    document.getElementById('rvUid').textContent = 'UID ' + p.uid;
-    document.getElementById('rvName').textContent = p.nick + (p.me ? '（我）' : '');
+    const _ru = document.getElementById('rvUid');
+    _ru.textContent = 'UID ' + p.uid;        // 纯文本，复制按钮是旁边的兄弟节点
+    _ru.onclick = () => qCopy(p.uid);
+    // 名字后面挂等级 Lv.xx（来自回放 Room 帧 model.Player#25）
+    document.getElementById('rvName').innerHTML =
+      window.__esc(p.nick) + (p.me ? '（我）' : '')
+      + (p.level ? '<i class="rlv">Lv.' + p.level + '</i>' : '');
     // 顺序：角色 · 地图 · 顺位（角色稍作着重；UID 已移到名字上方）
     const sub = [];
     const heroTxt = p.hero_name || (p.hero_id ? '英雄' + p.hero_id : '');
     if(heroTxt) sub.push('<span class="rhero">' + window.__esc(heroTxt) + '</span>');
-    if(rv.map_name) sub.push(window.__esc(rv.map_name));
+    if(rv.map_name) sub.push(window.__esc(rv.map_name) + dChip(rv.difficulty));
     if(p.slot !== undefined && p.slot !== null) sub.push(window.__esc((p.slot + 1) + ' 号位'));
     document.getElementById('rvSub').innerHTML =
       sub.join('<span class="rsplit">·</span>');
@@ -923,6 +1093,191 @@ async function saveText(btn){
   }catch(e){ tip('保存失败：' + e, true); }
   if(btn){ btn.disabled = false; btn.textContent = '保存为markdown文件'; }
 }
+
+// ── ★ 复盘查询：一个输入框自动识别「回放号 / UID」──
+function qesc(v){
+  return String(v==null?'':v).replace(/[&<>"]/g,
+      c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+// 难度标（颜色区分）：0 普通 / 1 困难 / 2 噩梦 / 3 疯狂 / 4 极限
+const DIFF_NAME = ['普通', '困难', '噩梦', '疯狂', '极限'];
+function dChip(n){
+  if(n === null || n === undefined || n === '') return '';
+  const v = Number(n);
+  if(!(v >= 0 && v <= 4)) return '';
+  return '<span class="dh dh' + v + '">' + DIFF_NAME[v] + '</span>';
+}
+
+function qsay(msg, bad){
+  const box = document.getElementById('qmsg');
+  if(!box) return;
+  box.textContent = msg ? ((bad ? '⚠ ' : '✓ ') + msg) : '';
+  box.className = 'savemsg' + (msg ? ' on' : '') + (bad ? ' bad' : '');
+}
+function qDate(ts){
+  if(!ts) return '—';
+  const d = new Date(ts*1000);
+  if(isNaN(d)) return '—';
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// 16 位回放号超出 JS 安全整数范围，必须当字符串传给复盘弹窗（内部只当缓存键用）
+function qref(rid){ return "'" + String(rid) + "'"; }
+
+async function doQuery(){
+  const raw = ((document.getElementById('qin') || {}).value || '').trim();
+  const box = document.getElementById('qbox');
+  if(!raw){ qsay('请先输入回放号或 UID', true); return; }
+  qsay('');
+  box.innerHTML = '<div class="mload">查询中…</div>';
+  let r;
+  try{ r = await window.pywebview.api.query(raw); }
+  catch(e){ box.innerHTML = '<div class="mload">✗ ' + qesc(e) + '</div>'; return; }
+  if(!r || !r.ok){
+    box.innerHTML = '<div class="mload">✗ ' + qesc((r && r.msg) || '查询失败') + '</div>';
+    return;
+  }
+  if(!window.__esc) window.__esc = qesc;      // 未登录时 renderStats 也要能转义
+
+  if(r.kind === 'replay'){
+    qsay('已取到这一局的回放数据' + (r.map_name ? '（' + r.map_name + '）' : ''));
+    const rec = (r.records || [])[0] || {};
+    box.innerHTML = `<div class="match open">
+      <div class="mhead">
+        <div class="t">回放号 ${qesc(r.replay_id)}</div>
+        <div class="m got">${qesc(r.map_name || '未知地图')}${dChip(r.difficulty)}</div>
+        <div class="res">对局</div>
+        <div class="h"></div>
+        <div class="arw">▶</div>
+      </div>
+      <div class="mbody" id="qbody"></div>
+    </div>`;
+    const body = document.getElementById('qbody');
+    body.dataset.loaded = '1';
+    body.innerHTML = renderStats(rec, r.stats || {}, qref(r.replay_id));
+    return;
+  }
+
+  // ── UID：简况 + 最近 10 局 ──
+  const st = r.statistics || {};
+  const all = st.fightCount || 0, win = st.winFightCount || 0;
+  const rate = all ? (100 * win / all).toFixed(1) : '—';
+  qsay('已取到 ' + (r.nick || ('UID ' + r.uid)) + ' 的最近对局');
+  const head = `<div class="qme"><b>${qesc(r.nick || ('UID ' + r.uid))}</b>
+      <span class="quid" onclick="qCopy('${r.uid}', this)" title="复制 UID">UID <b>${r.uid}</b><i class="qcp" onclick="event.stopPropagation();qCopy('${r.uid}', this)">${QCP_ICON}</i></span>
+      <span class="qsub">${r.level ? '等级 ' + r.level + ' · ' : ''}${r.online ? '在线' : '离线'}
+      · 总场次 <b>${all}</b> · 胜场 <b>${win}</b>（${rate}%）
+      · 皮肤 <b>${st.skinCount || 0}</b> · 获赞 <b>${st.praiseNum || 0}</b></span></div>`;
+  const recs = r.records || [];
+  window.__qrecs = recs;
+  if(!recs.length){
+    box.innerHTML = head + '<div class="box"><div class="empty">这个玩家最近没有可查的对局</div></div>';
+    return;
+  }
+  box.innerHTML = head + '<div class="box">' + recs.map((rec, i) => `
+    <div class="match" id="qm${i}">
+      <div class="mhead" onclick="toggleQ(${i})">
+        <div class="t">${qDate(rec.time)}</div>
+        <div class="m${rec.map_name ? ' got' : ''}" id="qmap${i}">${qesc(rec.map_name || '—')}${dChip(rec.difficulty)}</div>
+        <div class="res ${rec.rank===1?'win':'lose'}">${rec.rank===1?'胜利':(rec.rank?'第'+rec.rank+'名':'—')}</div>
+        <div class="h">${qesc(rec.hero || '')}</div>
+        <div class="arw">▶</div>
+      </div>
+      <div class="mbody" id="qmb${i}"></div>
+    </div>`).join('') + '</div>';
+}
+
+// 复制按钮的图标（内联 SVG：两个叠起来的方框；界面里不允许用 emoji）
+const QCP_ICON = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">'
+  + '<rect x="5.6" y="1.6" width="8.8" height="9.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+  + '<path d="M11.2 14.4H3.6a2 2 0 0 1-2-2V4.8" fill="none" stroke="currentColor" stroke-width="1.5"'
+  + ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// 复制成功的小提示：从锚点上方跳一下，然后慢慢淡掉
+window.qToast = (text, anchor) => {
+  const el = document.createElement('div');
+  el.className = 'qtoast';
+  el.textContent = text;
+  el.style.left = '0px';
+  el.style.top = '-999px';
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const r = (anchor && anchor.getBoundingClientRect) ? anchor.getBoundingClientRect() : null;
+  const cx = r ? r.left + r.width / 2 : window.innerWidth / 2;
+  const cy = r ? r.top : 90;
+  el.style.left = Math.round(cx - w / 2) + 'px';      // 量完宽高再定位，比 translate(-50%) 稳
+  el.style.top = Math.round(cy - h - 6) + 'px';       // 浮在锚点上方
+  // 动画结束就撤（比定时器可靠：后台/无头页面会把 setTimeout 节流），定时器只兜底
+  el.addEventListener('animationend', () => { if(el.parentNode) el.parentNode.removeChild(el); });
+  setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 2000);
+};
+
+// 复制到剪贴板：先试浏览器剪贴板，不行走后端原生（WebView 里 file:// 页面不可靠）
+window.qCopy = async (text, anchor) => {
+  const s = String(text == null ? '' : text);
+  if(!s) return;
+  let ok = false;
+  try{ await navigator.clipboard.writeText(s); ok = true; }catch(e){ ok = false; }
+  if(!ok){
+    try{ const r = await window.pywebview.api.copy_text(s); ok = !!(r && r.ok); }catch(e){ ok = false; }
+  }
+  if(ok) qToast('已复制 ' + s, anchor || null);
+  else qsay('复制失败，请手动选中复制', true);
+};
+
+// 复盘弹窗 UID 旁边的图标按钮（UID 文本在 #rvUid 里）
+window.qCopyUid = (el) => {
+  const u = document.getElementById('rvUid');
+  qCopy((u ? u.textContent : '').replace(/^UID\s*/, '').trim(), el || u);
+};
+
+// 静态 HTML 里的复制按钮补上图标
+document.querySelectorAll('.qcp').forEach(el => { if(!el.innerHTML.trim()) el.innerHTML = QCP_ICON; });
+
+// 清空复盘查询面板（退出登录时调用：上次的查询结果不该留到下次登录）
+window.qReset = () => {
+  const i = document.getElementById('qin'); if(i) i.value = '';
+  const b = document.getElementById('qbox'); if(b) b.innerHTML = '';
+  const m = document.getElementById('qmsg');
+  if(m){ m.textContent = ''; m.className = 'savemsg'; }
+  document.querySelectorAll('.qtoast').forEach(e => e.remove());
+  window.__qrecs = null;
+  if(typeof window.closeReview === 'function') window.closeReview();
+};
+
+window.toggleQ = i => {
+  const el = document.getElementById('qm' + i);
+  const body = document.getElementById('qmb' + i);
+  const open = el.classList.toggle('open');
+  if(open && !body.dataset.loaded) loadQStats(i, body);
+};
+
+window.loadQStats = async (i, body) => {
+  body.dataset.loaded = '1';
+  const rec = (window.__qrecs || [])[i] || {};
+  const rid = String(rec.replayId || '');
+  body.innerHTML = '<div class="mload">正在下载这一局的回放并解析…（首次稍慢，同一局再开秒开）</div>';
+  try{
+    const r = await window.pywebview.api.load_match(rid);
+    if(!r || !r.ok){
+      body.innerHTML = '<div class="mload">✗ ' + qesc((r && r.msg) || '读取失败') + '</div>';
+      body.dataset.loaded = '';
+      return;
+    }
+    const mapEl = document.getElementById('qmap' + i);
+    if(mapEl && r.map_name){
+      // 用 innerHTML：textContent 会把难度标一起抹掉
+      mapEl.innerHTML = qesc(r.map_name) + dChip(rec.difficulty);
+      mapEl.classList.remove('none');
+      mapEl.classList.add('got');
+    }
+    if(!window.__esc) window.__esc = qesc;
+    body.innerHTML = renderStats({players: r.players || rec.players || []}, r.stats || {}, qref(rid));
+  }catch(e){
+    body.innerHTML = '<div class="mload">✗ ' + qesc(e) + '</div>';
+    body.dataset.loaded = '';
+  }
+};
 
 // 版本号由后端注入（唯一真源 = main.py 的 VERSION）
 window.addEventListener("pywebviewready", () => {

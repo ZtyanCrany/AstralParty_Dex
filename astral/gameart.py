@@ -96,6 +96,71 @@ def find_cache():
     return None
 
 
+# ══════════════════ 皮肤立绘变体（用于判定「有没有羁绊皮肤」）══════════════════
+#
+# catalog 里的资源名本身带着皮肤结构：
+#     UT_Hero_ProfilePhoto_<角色ID>              初始立绘
+#     UT_Hero_ProfilePhoto_<角色ID>_Max          羁绊（满羁绊）立绘
+#     UT_Hero_ProfilePhoto_<角色ID>_01 / _02 …   第 1/2… 套名皮
+# 35 个角色里，没有 _Max 立绘的恰是六个联动角色，因此以本机立绘为准比人工维护名单可靠。
+# 读不到 catalog（没装游戏 / 没启动过）就返回空，由调用方兜底，绝不报错。
+
+_VARIANT_CACHE = {}                     # (catalog 路径, mtime) → 结果
+
+
+def skin_variants(cache=None):
+    """{角色ID: {'base': bool, 'max': bool, 'named': ['01', ...]}}；取不到返回 {}。"""
+    cache = cache or find_cache()
+    if not cache:
+        return {}
+    try:
+        cats = sorted(cache.glob('catalog_*.json'))
+    except Exception:
+        return {}
+    if not cats:
+        return {}
+    cat = cats[-1]
+    try:
+        key = (str(cat), cat.stat().st_mtime)
+    except OSError:
+        return {}
+    hit = _VARIANT_CACHE.get(key)
+    if hit is not None:
+        return hit
+
+    out = {}
+    try:
+        data = json.loads(cat.read_text(encoding='utf-8-sig'))
+        raw = base64.b64decode(data['m_KeyDataString'])
+    except Exception:
+        _VARIANT_CACHE[key] = {}
+        return {}
+    pat = re.compile(r'UT_Hero_ProfilePhoto_(\d{3})(?:_(.+))?')
+    for run in re.findall(rb'[\x20-\x7e]{6,}', raw):
+        for m in pat.finditer(run.decode('ascii', 'ignore')):
+            e = out.setdefault(int(m.group(1)), {'base': False, 'max': False, 'named': []})
+            suf = m.group(2)
+            if suf is None:
+                e['base'] = True
+            elif suf == 'Max':
+                e['max'] = True
+            elif re.fullmatch(r'\d{2}', suf) and suf not in e['named']:
+                e['named'].append(suf)
+    for e in out.values():
+        e['named'].sort()
+    _VARIANT_CACHE[key] = out
+    return out
+
+
+def bondless_ids(cache=None):
+    """没有羁绊立绘的角色编号（= 联动角色）。取不到本机游戏资源时返回空集合。"""
+    try:
+        # 只认 101 起的正式角色编号（资源里的 100 是一张 UI 立绘，不是角色）
+        return {hid for hid, e in skin_variants(cache).items() if not e['max'] and hid >= 101}
+    except Exception:
+        return set()
+
+
 def _steam_roots():
     """Steam 库根目录：注册表里的 SteamPath + libraryfolders.vdf 里登记的库。"""
     roots = []

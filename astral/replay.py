@@ -169,6 +169,8 @@ class Replay:
                         'nick': getattr(pl, 'nick', '') or '',
                         'hero_id': pl.hero.hero_id,
                         'slot': getattr(pl, 'slot', 0),
+                        # 玩家等级：Room 帧 model.Player#25（回放里真实带着，例如 27 级）
+                        'level': int(getattr(pl, 'level', 0) or 0),
                         # 立绘/皮肤 ID：100 + <角色3位> + <皮肤序号3位>（例 100123001）
                         'skin': int(getattr(pl.hero, 'standingPainting', 0) or 0),
                     }
