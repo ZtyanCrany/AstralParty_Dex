@@ -3,12 +3,12 @@
 **星趴档案** ｜ 中文 README → [README.md](README.md)
 
 > 《Astral Party》(CN server「吉星派对」)
-> Authors: **Nemophila & ZtyanCrany** ｜ Version **v1.1.1**
+> Authors: **Nemophila & ZtyanCrany** ｜ Version **v1.2.0**
 
-A tidy self-service tool: log in with your own account, then browse your full profile, skin
-collection and recent matches — click any match to see each player's **round-by-round summary
-and relic pickups**.
-**All data is processed on your own machine.**
+A tidy self-service tool: log in with your own account, then browse your profile, skin collection
+and recent matches, or look up a match by replay id / a player by UID — click any match to see each
+player's **round-by-round summary and relic pickups**.
+**All data is processed on your own machine**; game artwork is read from the locally installed game.
 
 ---
 
@@ -18,11 +18,12 @@ and relic pickups**.
 | --- | --- |
 | **Login (登录页面)** | SMS-code login; the session can be remembered for automatic login next time |
 | **My Profile (我的信息)** | Level, total matches / wins / win-rate, owned characters, skins, likes, character usage ranking |
-| **My Skins (我的皮肤)** | Every skin of every character, owned or not, with bond status, level and potential |
+| **My Skins (我的皮肤)** | Every skin of every character, owned or not, with bond status |
 | **Recent Matches (最近对局)** | The latest 10 matches; expand one to see all four players' stats, click a player name for their per-round summary and relic pickups |
+| **Replay Lookup (复盘查询)** | One box that takes a **replay id** or a **player UID**: a replay id opens that single match, a UID lists that player's latest 10 matches (no login required) |
 | **Export (档案导出)** | One-click Markdown archive (usage ranking + match details), copy it or save to a file |
 
-### 🎲 Replay Breakdown (new in v1.1.0)
+### 🎲 Replay Breakdown (new in v1.1.0, difficulty and level added in v1.2.0)
 
 Click a player name inside 「Recent Matches」 to open that player's replay window:
 
@@ -32,6 +33,17 @@ Click a player name inside 「Recent Matches」 to open that player's replay win
 - **Relic pickup log** — grouped by round, with the source labelled (quest completion / star-up /
   shop purchase / cycle), showing which relic was chosen out of the three choices and what came
   up **before and after a reroll**
+
+### 🔍 Replay Lookup (new in v1.2.0)
+
+「Replay Lookup」 in the sidebar has a single box that works out what you are asking for:
+
+- **A replay id** — opens that one match in full: all four players' round-by-round stats and relic
+  pickups can be expanded
+- **A player UID** — lists that player's latest 10 matches; click any of them for the full breakdown
+
+Lookups need **no login**, so you can pull up a friend's matches; every match is tagged with its
+difficulty.
 
 ---
 
@@ -51,7 +63,11 @@ Click a player name inside 「Recent Matches」 to open that player's replay win
 
 ![Replay detail](screenshots/04-replay-detail.png)
 
-**My Skins** — every skin of every character, owned or not, with bond status / level / potential
+**Replay Lookup** — enter a replay id or a player UID to see a single match or that player's latest 10 matches
+
+![Replay Lookup](screenshots/07-query.png)
+
+**My Skins** — every skin of every character, owned or not, with bond status
 
 ![My Skins](screenshots/05-skins.png)
 
