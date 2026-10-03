@@ -726,8 +726,8 @@ def _avatar_data(tag):
 #   耗时参考（16 核）：首次全量约 26.6 秒 · 后续启动约 0.3 秒（水位线跳过已扫的包）。
 #   策略：后台线程运行，**不阻塞登录界面**；进度由前端轮询 art_status() 获取。
 # ════════════════════════════════════════════════════════════
-ART_STATE = {'running': False, 'text': '', 'i': 0, 'n': 0, 'done': True,
-             'found': 0, 'game': True, 'seconds': 0, 'reason': ''}
+ART_STATE = {'running': False, 'text': '正在检查本机游戏的头像资源…', 'i': 0, 'n': 0,
+             'done': False, 'found': 0, 'game': True, 'seconds': 0, 'reason': ''}
 ART_LOCK = threading.Lock()
 
 
@@ -1744,8 +1744,10 @@ def main():
     webview.create_window('星趴档案', str(asset('ui', 'app.html')),
                           js_api=api, width=ww, height=wh,
                           min_size=(980, 620), background_color='#F0EEE6')
-    art_scan_start()          # 后台从本机游戏补全头像资源（不阻塞登录界面）
-    webview.start()
+    # 头像扫描交给 webview.start 的回调执行：必须等 GUI 后端（pythonnet → .NET 程序集）
+    # 加载完成后再起扫描线程。放在 start() 之前会与 .NET 加载抢同一批原生 DLL，
+    # 偶发程序集解析失败并直接崩在启动阶段（表现为「Unhandled exception in script」）。
+    webview.start(art_scan_start)
 
 
 if __name__ == '__main__':
