@@ -94,6 +94,42 @@
   button:hover{ filter:brightness(1.07); }
   button:disabled{ opacity:.4; cursor:not-allowed; }
   button.ghost{ background:#fff; color:var(--ink); border:1px solid var(--line); }
+
+  /* ── 渠道客户端登录（Steam / 国际服 / B站）：复用本机游戏已登录的票 ── */
+  .chbox{ border:1px solid var(--line); background:#FBF9F4; border-radius:11px;
+          padding:13px 15px; margin-top:18px; max-width:440px; }
+  .chhead{ display:flex; align-items:center; gap:8px; font-size:13px; }
+  .chdot{ width:8px; height:8px; border-radius:50%; background:#C9C0AE; flex:0 0 auto; }
+  .chdot.on{ background:#7BA05B; }
+  /* 右上角刷新：重新检测本机登录记录（用户开游戏登录后点一下就行） */
+  .chref{ margin-left:auto; width:26px; height:26px; padding:0; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center; cursor:pointer;
+          background:transparent; border:1px solid transparent; border-radius:7px;
+          color:#8C8271; }
+  .chref:hover{ background:#F1EDE3; border-color:var(--line); color:#5A5142; }
+  .chref.spin svg{ animation:chspin .8s linear infinite; }
+  @keyframes chspin{ to{ transform:rotate(360deg); } }
+  .chrow{ display:flex; gap:10px; margin-top:11px; }
+  .chrow button{ flex:1; }
+  /* 两个渠道按钮各用自家品牌色区分：Steam 蓝 / Bilibili 粉 */
+  .chrow button.lgSteam{ background:#2C5C8F; border-color:#2C5C8F; color:#fff; }
+  .chrow button.lgSteam:hover{ background:#244C79; border-color:#244C79; }
+  .chrow button.lgBili{ background:#FB7299; border-color:#FB7299; color:#fff; }
+  .chrow button.lgBili:hover{ background:#E85D86; border-color:#E85D86; }
+  /* TapTap 品牌色：#00C4B2（以官方 PC 客户端 UI 实测取色为准；
+     taptap.io 品牌资源页给的是 #28C290，偏绿，客户端没用它） */
+  .chrow button.lgTap{ background:#00C4B2; border-color:#00C4B2; color:#fff; }
+  .chrow button.lgTap:hover{ background:#00A697; border-color:#00A697; }
+  /* 登录记录失效时的提示（按钮正下方） */
+  .chmsg{ display:none; margin-top:9px; font-size:12px; color:#C0453A; }
+  .chmsg.on{ display:block; }
+  .chhint{ margin-top:10px; font-size:12px; line-height:1.75; color:var(--dim); }
+  .chhint b{ color:#5A5142; }
+  .chhint i{ font-style:normal; color:#A79C88; }
+  .chhint i.warn{ color:#C0453A; }
+  .orsep{ display:flex; align-items:center; gap:10px; margin:18px 0 4px;
+          color:#A79C88; font-size:12px; max-width:440px; }
+  .orsep:before, .orsep:after{ content:""; height:1px; background:var(--line); flex:1; }
   #msg{ margin-top:14px; font-size:13px; min-height:20px; max-width:440px; }
   #msg.ok{ color:var(--ok); } #msg.err{ color:var(--accent); } #msg.wait{ color:var(--dim); }
 
@@ -218,6 +254,36 @@
   /* 名字后面的等级 Lv.xx：比名字弱一档，不抢主体 */
   .rvhead .rn .rlv{ font-style:normal; font-size:12px; font-weight:500;
                     color:#A79F91; margin-left:5px; letter-spacing:.2px; }
+  /* 我的信息：玩家名后的等级 + 渠道标签（四色区分：飞魔通行证/Steam/Bilibili/TapTap） */
+  #nick .nlv{ font-style:normal; font-size:13px; font-weight:500;
+              color:#A79F91; margin-left:7px; letter-spacing:.2px; }
+  #nick .chtag{ display:inline-block; margin-left:8px; padding:1px 8px 2px;
+                font-size:11px; line-height:16px; font-weight:600; color:#fff;
+                border-radius:9px; vertical-align:3px; letter-spacing:.3px; }
+  .chtag.t-phone{ background:#B4633A; }
+  .chtag.t-steam{ background:#2C5C8F; }
+  .chtag.t-bilibili{ background:#FB7299; }
+  .chtag.t-taptap{ background:#00C4B2; }
+  /* 手机登录方式切换：验证码 ⇄ 密码（挂在“或使用…”那行右端）
+     ⚠ 那行两侧的横线是 .orsep:before/:after 画的 —— 绝对定位的链接会正压在上面，
+     看着就像被划掉。所以要用背景色把线盖住，且链接自己不能再加下划线。 */
+  .orsep{ position:relative; }
+  .orsep .sw{ position:absolute; right:0; top:50%; transform:translateY(-50%);
+              font-size:12px; line-height:1; color:#B4633A; cursor:pointer;
+              user-select:none; background:var(--bg); padding:2px 7px;
+              border-radius:4px; }
+  .orsep .sw:hover{ color:#8E4A2A; background:#F7F4EC; }
+  /* 手机登录行：密码框里的“显示密码”图标按钮（仅密码模式可见） */
+  .row .pw{ position:relative; flex:1; display:flex; min-width:0; }
+  .row .pw input{ flex:1; min-width:0; padding-right:34px; }
+  .row .eye{ position:absolute; right:5px; top:50%; transform:translateY(-50%);
+             display:none; width:26px; height:26px; padding:0;
+             align-items:center; justify-content:center;
+             background:transparent; border:0; border-radius:6px;
+             color:#A79F91; cursor:pointer; }
+  .row .eye:hover{ color:var(--ink); background:#EDE7DA; }
+  body.pwdmode #btnCode{ display:none; }
+  body.pwdmode .row .eye{ display:flex; }
   .rvhead .rx{ margin-left:auto; cursor:pointer; color:#A79F91; font-size:15px;
                padding:2px 8px; border-radius:7px; }
   .rvhead .rx:hover{ background:#EDE7DA; color:var(--ink); }
@@ -326,6 +392,9 @@
   .skrow.noh .skhead b{ color:#A79F91; }
   .skrow.noh .skhead em{ color:#BFB7A5; }
   .skrow.noh .chips .chip{ opacity:.5; }
+  /* 角色列表里「未拥有」的行整体发灰（与皮肤列表同一套观感） */
+  #heroes tr.noh{ opacity:.5; }
+  #heroes tr.noh:hover{ opacity:.8; }
   /* ── 排序小图标按钮（内联 SVG，无 emoji） ── */
   .sbtn{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
          margin-left:4px; vertical-align:-0.5px; border-radius:4px; cursor:pointer; color:#BEB29A;
@@ -409,12 +478,37 @@
 
     <div class="pane" id="p-login">
       <h2>登录</h2>
+      <div class="chbox" id="chBox">
+        <div class="chhead">
+          <span class="chdot" id="chDot"></span>
+          <span>渠道客户端登录</span>
+          <button class="chref" id="chRef" title="重新检测本机的登录记录" onclick="channelState()">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path d="M20 11a8 8 0 1 0-.6 4" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M20 4.6V11h-6.4" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="chrow">
+          <button id="btnSteam" class="lgSteam" onclick="steamLogin()">Steam登录</button>
+          <button id="btnBili" class="lgBili" onclick="biliLogin()">Bilibili登录</button>
+          <button id="btnTap" class="lgTap" onclick="taptapLogin()">TapTap登录</button>
+        </div>
+        <div class="chmsg" id="chMsg"></div>
+        <div class="chhint" id="chHint">正在检查本机的登录记录…</div>
+      </div>
+      <div class="orsep"><span>或使用手机号验证码登录</span>
+        <a class="sw" id="btnSwap" onclick="swapMode()">改用密码登录</a></div>
       <div class="row" style="margin-top:18px">
         <input id="phone" placeholder="手机号" maxlength="11">
         <button id="btnCode" onclick="sendCode()">发送验证码</button>
       </div>
       <div class="row">
-        <input id="code" placeholder="短信验证码" maxlength="8">
+        <span class="pw"><input id="code" placeholder="短信验证码" maxlength="8">
+          <button id="btnEye" class="eye" onclick="toggleEye()" title="显示密码"
+                  aria-label="显示密码"></button></span>
         <button id="btnLogin" onclick="doLogin()">登 录</button>
       </div>
       <div class="row" style="margin-top:4px">
@@ -550,6 +644,120 @@ window.renderStats = (r, st, mi) => {
       　总承伤 <b>${sum('承伤')}</b>　总星币 <b>${sum('星币')}</b></span></div>`;
 };
 
+
+// ── 渠道客户端登录（Steam / Bilibili）：复用本机客户端留下的登录记录 ──
+// 两家客户端都会把长效票写进自己的日志（约 30 天），所以【不必让游戏保持在线】；
+// 没有记录时才回退去读运行中客户端的内存。
+// 关键：点按钮之前就把"会登成哪个号"亮出来（没有就明说"未检测到"）。
+// 右上角刷新按钮 = 重跑一遍检测：用户中途去开游戏登录后，点它就能看到检测成功。
+let CH = { s: '', b: '' };             // 当前检测到的两个账号名（空串 = 未检测到）
+let CHWarn = false;                    // 第 1 条是否该标红（重绘提示时要保留）
+
+function chRedNote1(on){               // 第 1 条提示变红：点了按钮却没账号可登
+  CHWarn = !!on;
+  const els = document.querySelectorAll('#chHint i');
+  if(els[0]) els[0].className = on ? 'warn' : '';
+}
+function chSay(msg){                   // 按钮正下方的失效提示
+  const el = $('#chMsg');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.className = msg ? 'chmsg on' : 'chmsg';
+}
+async function channelState(){
+  const dot = $('#chDot'), hint = $('#chHint'), ref = $('#chRef');
+  if(ref) ref.className = 'chref spin';
+  if(hint) hint.innerHTML = '正在检查本机的登录记录…';
+  chSay(''); chRedNote1(false);
+  let s = null, b = null, t = null;
+  try{
+    const r = await Promise.all([window.pywebview.api.steam_state(),
+                                 window.pywebview.api.bili_state(),
+                                 window.pywebview.api.taptap_state()]);
+    s = r[0]; b = r[1]; t = r[2];
+  }catch(e){}
+  // Steam：先用客户端登录记录；没有记录才去问内存（游戏正开着时能读到）
+  let sName = (s && s.log && s.log.user) || '';
+  if(!sName){
+    try{
+      const a = await window.pywebview.api.steam_account();
+      const one = (a && a.ok && (a.sessions || [])[0]) || {};
+      if(one.label) sName = String(one.label).replace(/^Steam 登录 · /, '').trim();
+    }catch(e){}
+  }
+  const bName = (b && b.ok && b.user) ? b.user : '';
+  const tName = (t && t.ok && t.user) ? t.user : '';
+  CH = { s: sName, b: bName, t: tName };
+  if(dot) dot.className = 'chdot' + (sName || bName || tName ? ' on' : '');
+  if(ref) ref.className = 'chref';
+  if(!hint) return;
+  hint.innerHTML =
+      (sName ? '检测到Steam游戏账号：<b>' + sName + '</b>' : '未检测到Steam游戏账号')
+    + '<br>' + (bName ? '检测到Bilibili游戏账号：<b>' + bName + '</b>'
+                      : '未检测到Bilibili游戏账号')
+    + '<br>' + (tName ? '检测到TapTap游戏账号：<b>' + tName + '</b>'
+                      : '未检测到TapTap游戏账号')
+    + '<br><i' + (CHWarn ? ' class="warn"' : '') + '>1·若未检测到游戏账号，'
+    + '则使用对应渠道登录一次游戏，再刷新本页面</i>'
+    + '<br><i>2·本工具登录会将游戏挤下线，属正常现象，待进入主页后，可再登进游戏</i>';
+}
+// 点渠道按钮的前置检查：这个渠道到底有没有登录记录？没有就红第 1 条
+function chPre(ch){
+  const has = (ch === 'steam' ? CH.s : ch === 'bili' ? CH.b : CH.t);
+  chRedNote1(!has);
+  chSay('');
+  return has;
+}
+// 失败收尾：把"已失效，请重新登录一次"留在按钮下方（重扫会清提示，扫完再放回）
+function chDone(r){
+  if(r && r.ok) return true;
+  const msg = (r && r.msg) || '登录失败';
+  say(msg,'err');
+  chSay(msg);
+  if(r && (r.expired || r.need_login)){
+    // 先重扫一遍（能发现记录已不在/仍失效），扫完再把提示和红字放回去
+    channelState().then(()=>{ chSay(msg); chRedNote1(true); });
+  }
+  return false;
+}
+async function steamLogin(){
+  const b = $('#btnSteam'); if(b) b.disabled = true;
+  chPre('steam');
+  say('正在用本机的 Steam 登录记录登录…','wait');
+  let r;
+  try{ r = await window.pywebview.api.steam_login(); }
+  catch(e){ r = {ok:false, msg:'调用失败：' + e}; }
+  if(b) b.disabled = false;
+  if(!chDone(r)) return;
+  say(r.msg,'ok');
+  afterLogin(r.profile);
+}
+
+// ── B站 / TapTap 渠道：票同样来自客户端日志，免提权、也不必让游戏在线 ──
+async function biliLogin(){
+  const b = $('#btnBili'); if(b) b.disabled = true;
+  chPre('bili');
+  say('正在用本机的 Bilibili 登录记录登录…','wait');
+  let r;
+  try{ r = await window.pywebview.api.bili_login(); }
+  catch(e){ r = {ok:false, msg:'调用失败：' + e}; }
+  if(b) b.disabled = false;
+  if(!chDone(r)) return;
+  say(r.msg,'ok');
+  afterLogin(r.profile);
+}
+async function taptapLogin(){
+  const b = $('#btnTap'); if(b) b.disabled = true;
+  chPre('tap');
+  say('正在用本机的 TapTap 登录记录登录…','wait');
+  let r;
+  try{ r = await window.pywebview.api.taptap_login(); }
+  catch(e){ r = {ok:false, msg:'调用失败：' + e}; }
+  if(b) b.disabled = false;
+  if(!chDone(r)) return;
+  say(r.msg,'ok');
+  afterLogin(r.profile);
+}
 
 async function sendCode(){
   const p = $('#phone').value.trim();
@@ -715,17 +923,48 @@ async function artPoll(){
 }
 
 window.addEventListener('pywebviewready', ()=>setTimeout(()=>boot(true), 120));
+window.addEventListener('pywebviewready', ()=>setTimeout(channelState, 600));
 window.addEventListener('pywebviewready', ()=>setTimeout(artPoll, 300));
 function unlock(){
   const _ns=document.getElementById('navSkin'); if(_ns) _ns.classList.remove('lock');
   ['navProfile','navMatch','navExport','navQuery'].forEach(id=>$('#'+id).classList.remove('lock'));
 }
+let PWD_MODE = false;          // false = 手机验证码登录，true = 手机密码登录
+const _EYE_ON  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+const _EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/><path d="M4.5 19.5 19.5 4.5"/></svg>';
+function toggleEye(){                        // 密码框右侧的“显示/隐藏密码”
+  const c = $('#code'), b = $('#btnEye');
+  if(!c || !b) return;
+  const show = c.type === 'password';        // 现在是密文 ⇒ 点一下变明文
+  c.type = show ? 'text' : 'password';
+  b.title = show ? '隐藏密码' : '显示密码';
+  b.innerHTML = show ? _EYE_OFF : _EYE_ON;
+}
+function swapMode(){
+  PWD_MODE = !PWD_MODE;
+  const sp = document.querySelector('.orsep span'), sw = $('#btnSwap');
+  const c = $('#code');
+  document.body.classList.toggle('pwdmode', PWD_MODE);   // 样式全交给 CSS
+  if(PWD_MODE){
+    if(sp) sp.textContent = '或使用手机号密码登录';
+    if(sw) sw.textContent = '改用验证码登录';
+    c.type = 'password'; c.placeholder = '密码'; c.maxLength = 32;
+  }else{
+    if(sp) sp.textContent = '或使用手机号验证码登录';
+    if(sw) sw.textContent = '改用密码登录';
+    c.type = 'text'; c.placeholder = '短信验证码'; c.maxLength = 8;
+  }
+  const b = $('#btnEye');
+  if(b){ b.innerHTML = _EYE_ON; b.title = '显示密码'; }
+  c.value = ''; say('');
+}
 async function doLogin(){
   const p=$('#phone').value.trim(), c=$('#code').value.trim();
   if(!/^1\d{10}$/.test(p)) return say('手机号格式不对','err');
-  if(c.length<4) return say('验证码太短','err');
+  if(PWD_MODE ? !c : c.length<4) return say(PWD_MODE?'请输入密码':'验证码太短','err');
   say('正在登录…','wait'); $('#btnLogin').disabled=true;
-  const r = await window.pywebview.api.do_login(p,c);
+  const r = PWD_MODE ? await window.pywebview.api.do_login_pwd(p,c)
+                     : await window.pywebview.api.do_login(p,c);
   $('#btnLogin').disabled=false;
   if(!r.ok) return say(r.msg,'err');
   say(r.msg,'ok'); afterLogin(r.profile);
@@ -770,12 +1009,19 @@ window.hSort = col => {
 window.paintHeroes = () => {
   const d = window.__profile; if(!d || !d.heroes) return;
   const s = window.__hSort || HSORT_DEF;
-  const rows = d.heroes.slice().sort((a,b) =>
-    ((s.dir === 'asc' ? 1 : -1) * (heroVal(a, s.key) - heroVal(b, s.key)))
-    || ((Number(b.n) || 0) - (Number(a.n) || 0))          // 并列时：场次从多到少
-    || ((Number(a.id) || 0) - (Number(b.id) || 0)));      // 再并列：按编号，保证顺序稳定
+  const rows = d.heroes.slice().sort((a,b) => {
+    // 按编号排时保持纯编号序；按其它列排时，未拥有的角色一律沉到最后，
+    //   否则升序时满屏灰色行全挡在前面（用户明确要求）
+    if(s.key !== 'id'){
+      const oa = a.owned === false ? 1 : 0, ob = b.owned === false ? 1 : 0;
+      if(oa !== ob) return oa - ob;
+    }
+    return ((s.dir === 'asc' ? 1 : -1) * (heroVal(a, s.key) - heroVal(b, s.key)))
+      || ((Number(b.n) || 0) - (Number(a.n) || 0))          // 并列时：场次从多到少
+      || ((Number(a.id) || 0) - (Number(b.id) || 0));       // 再并列：按编号，保证顺序稳定
+  });
   const max = Math.max(...rows.map(h => h.n), 1);
-  document.getElementById('heroes').innerHTML = rows.map(h=>`<tr>
+  document.getElementById('heroes').innerHTML = rows.map(h=>`<tr${h.owned===false?' class="noh"':''}>
       <td>
         <div class="hero-name">
           ${avOf(h.id) ? `<img class="hav" alt="" src="${avOf(h.id)}">` : '<span class="hav"></span>'}
@@ -789,7 +1035,7 @@ window.paintHeroes = () => {
       <td class="num">${h.w||'—'}</td>
       <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}</td>
       <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
-      <td class="num">${h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>')}</td>
+      <td class="num">${h.owned===false?'—':(h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>'))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
   sbtnPaint('sbn_name', s.key === 'id' ? 'asc' : 'off');
   sbtnPaint('sbn_n',    s.key === 'n'  ? (s.dir === 'asc' ? 'asc' : 'desc') : 'off');
@@ -836,7 +1082,15 @@ function renderSkins(d){
 function render(d){
   window.__profile = d;                       // 记住当前档案：补到头像新图后要重渲染（见 artPoll）
   try{ renderSkins(d); }catch(e){}
-  $('#nick').textContent = d.nick;
+  // 玩家名后面挂等级 Lv.xx 与渠道标签；渠道取自 profile.channel（见后端 _finish_login）
+  const esc = window.__esc = window.__esc || (v => String(v == null ? '' : v)
+      .replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
+  const TAG = {phone:['飞魔通行证','t-phone'], steam:['Steam','t-steam'],
+               bilibili:['Bilibili','t-bilibili'], taptap:['TapTap','t-taptap']};
+  const tg = TAG[String(d.channel || 'phone')] || [String(d.channel || ''), 't-phone'];
+  $('#nick').innerHTML = esc(d.nick)
+      + (d.level ? '<i class="nlv">Lv.' + esc(d.level) + '</i>' : '')
+      + '<span class="chtag ' + tg[1] + '">' + esc(tg[0]) + '</span>';
   $('#subline').textContent = `UID ${d.uid}`;
   const cards = [
     ['累计参与', d.total, '局'],
@@ -860,8 +1114,6 @@ function render(d){
 
   const recs = (d.recent || []).slice().sort((a,b)=>(b.time||0)-(a.time||0));  // 从新到旧
   window.__recs = recs;
-  window.__esc = v => String(v==null?'':v).replace(/[&<>"]/g,
-      c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   $('#matchBox').innerHTML = recs.length ? recs.map((r,i)=>`
     <div class="match" id="m${i}">
       <div class="mhead" onclick="toggleMatch(${i})">

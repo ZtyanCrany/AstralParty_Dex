@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """星引擎 Party 国服 SDK 短信登录 —— 签名算法模块
 
-签名算法（由客户端反编译 FUN_180793550 与 GetSignKey 确认）：
+签名算法：
     sign = md5( 参数按「键名字母序」排成 k=v、用空字符串直接拼接 + 渠道密钥 )
 
 用法:
@@ -10,6 +10,8 @@
     r = authorize('13800138000', '123456')        # 验证码登录 → 拿 sid
 """
 import hashlib
+import os
+import platform
 import json
 import time
 import urllib.error
@@ -90,25 +92,39 @@ def send_code(tel_num, channel='test_junhai', type_='smslogin', **extra):
     return _post('/account/sendCode', p, channel)
 
 
-DEVICE_ID = '42af3d79b18141711023754cad1aaf3cb418d45f'
-OS_VERSION = 'Windows 11  (10.0.29671) 64bit'
-DEVICE_NAME = 'REDMI Book 16 2025(2.5K) (XIAOMI)'
+def device_id():
+    """设备号：按本机机器名推导的 40 位十六进制，同一台机器恒定。
+
+    不含任何硬编码的机器标识；也不参与任何账号绑定（服务器只当作设备名用）。
+    """
+    seed = (os.environ.get('COMPUTERNAME') or os.environ.get('USERNAME') or 'astral')
+    return hashlib.sha1((seed + '|astralparty-dex').encode('utf-8')).hexdigest()
+
+
+DEVICE_ID = device_id()
+OS_VERSION = '%s %s %s' % (platform.system(), platform.release(), platform.machine())
+DEVICE_NAME = 'Windows PC'
 
 
 def authorize(tel_num, code, login_type='3', channel='test_junhai', **extra):
-    """验证码登录 → 返回含 authorize_code(=sid) / data.accessToken 的响应
+    """登录 → 返回含 authorize_code(=sid) / data.accessToken 的响应
 
-    短信验证码登录使用 login_type=3，验证码参数名为 smscode（不是 code）。
+    凭据字段名随 login_type 变，两者只能出现一个（多传一个会被算进签名 ⇒ signError）：
+        login_type=3/8  短信验证码      → smscode
+        login_type=18   手机号 + 密码   → password
+                        （值须先做 md5(明文+md5(明文))，见 sdk_login.password_login）
+        login_type=2  带 access_token → access_token（由 extra 传入）
+    字段名取自客户端常量表的原文（LOGIN_TYPE / PASSWORD / TEL_NUM / ACCESS_TOKEN）。
       参数集必须与游戏完全一致：
         app_id / channel / sdk_version / device_id / time / os / login_type
-        / os_version / device_name / and_id / tel_num / smscode  (+ sign)
-      注：login_type=2 为「带 access_token 的自动登录」，使用它会回"登录态过期, 请重新登录"。
+        / os_version / device_name / and_id / tel_num / <凭据>  (+ sign)
     """
     p = {'app_id': APP_ID, 'channel': channel, 'sdk_version': SDK_VERSION,
          'device_id': DEVICE_ID, 'time': str(int(time.time())), 'os': OS,
          'login_type': login_type, 'os_version': OS_VERSION,
          'device_name': DEVICE_NAME, 'and_id': DEVICE_ID,
-         'tel_num': str(tel_num), 'smscode': str(code)}
+         'tel_num': str(tel_num)}
+    p['password' if str(login_type) in ('1', '18') else 'smscode'] = str(code)
     p.update(extra)
     return _post('/account/authorize', p, channel)
 

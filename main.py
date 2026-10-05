@@ -27,11 +27,13 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 from astral import client as C                       # noqa: E402
 from astral import proto_loader                      # noqa: E402
 from astral.sdk_login import (DEFAULT_DEVICE_ID,     # noqa: E402
-                              DEFAULT_EXTRA, request_code, phone_login)
+                              DEFAULT_EXTRA, request_code, phone_login,
+                              password_login)
 from astral.sdk_login import (patch_token_meta, clear_token,  # noqa: E402
                               load_token_info,)
 from astral.sdk_login import (auto_login as _auto,   # noqa: E402
-                              save_token, load_token)
+                              save_token, load_token, token_login)
+from astral import game_session                      # noqa: E402
 
 GAME_HOST, GAME_PORT = '101.132.186.71', 8800
 
@@ -148,7 +150,7 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.0'  # 工具版本号
+VERSION = 'v1.2.1'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 REPLAY_URL = 'https://sereplaycn.feimogames.com/prod/%s'
 
@@ -789,10 +791,23 @@ def _pairs(p, idx):
     return out
 
 def _heroes_of(p):
-    """角色卡 → 使用排行（含 PVE 等级与潜能三态）。"""
+    """角色卡 → 使用排行（含 PVE 等级与潜能三态）。
+
+    未拥有的角色也一并列出（名字取自静态角色表），带 owned=False，界面里发灰显示。
+    这样新角色一上线就能看见「有这个人，但我还没有」，而不是整行消失。
+    未拥有的行不参与排行统计：场次/胜率/PVE 等级留空，潜能显示为「—」。
+    """
     fc, wc = _pairs(p, 17), _pairs(p, 18)
+    cards = getattr(p, 'roleCard', {}) or {}
     heroes = []
-    for hid, card in p.roleCard.items():
+    for hid in sorted(set(cards) | set(HERO)):
+        card = cards.get(hid)
+        # ── 未拥有：只列名字与称号，其余留空 ──
+        if card is None:
+            heroes.append({'id': hid, 'name': HERO.get(hid, '角色#%d' % hid),
+                           'title': TITLE.get(hid, ''), 'n': 0, 'w': 0,
+                           'lv': None, 'brk': '—', 'owned': False})
+            continue
         n = fc.get(hid, 0)
         if not n and not card.isBreakThrough:
             n = 0
@@ -821,8 +836,9 @@ def _heroes_of(p):
         heroes.append({'id': hid, 'name': HERO.get(hid, '角色#%d' % hid),
                        'title': TITLE.get(hid, ''), 'n': n,
                        'w': wc.get(hid, 0), 'lv': _lv,
-                       'brk': _pot})
-    heroes.sort(key=lambda h: (-h['n'], h['id']))
+                       'brk': _pot, 'owned': True})
+    # 已拥有在前（按场次、编号），未拥有在后（按编号）
+    heroes.sort(key=lambda h: (0 if h.get('owned') else 1, -h['n'], h['id']))
 
     return heroes
 def _skins_of(p):
@@ -1385,6 +1401,9 @@ class Api:
         except Exception as e:
             return {'ok': False, 'msg': '登录态已失效，请重新用验证码登录一次（%s）'
                     % str(e)[:80]}
+        if isinstance(self.profile, dict):
+            # 渠道随 token.json 一起记住；老记录没这字段时按手机号登计算
+            self.profile['channel'] = (load_token_info() or {}).get('channel') or 'phone'
         self._remember_id()
         return {'ok': True, 'msg': '✓ 已用记住的登录态登录，免验证码',
                 'profile': self.profile}
@@ -1433,7 +1452,8 @@ class Api:
         """把 UID/昵称补进 token.json，供登录页显示。"""
         try:
             d = self.profile or {}
-            patch_token_meta(uid=d.get('uid'), nick=d.get('nick'))
+            patch_token_meta(uid=d.get('uid'), nick=d.get('nick'),
+                             channel=d.get('channel'))
         except Exception:
             pass
 
@@ -1443,15 +1463,14 @@ class Api:
         except Exception:
             return False
 
-    def do_login(self, phone: str, code: str):
-        phone = re.sub(r'\D', '', phone or '')
-        code = (code or '').strip()
+    def _finish_login(self, sid, resp, tel='', channel='phone'):
+        """登录成功后的公共收尾：记住本机登录态 → 读档案。
+
+        channel：本机这次是用哪种方式登进来的（phone/steam/bilibili/taptap）。
+        界面上的渠道标签就用它 —— 服务器给的 platform 一律回 CN_STEAM，认不得。
+        """
         try:
-            sid, resp = phone_login(phone, code)
-        except Exception as e:
-            return {'ok': False, 'msg': '登录失败：%s' % str(e)[:100]}
-        try:
-            saved = save_token(resp, phone)
+            saved = save_token(resp, tel)
             self.token_saved = bool(saved)
         except Exception:
             self.token_saved = False
@@ -1461,12 +1480,231 @@ class Api:
             (DATA_DIR / 'sid.txt').write_text(sid, encoding='utf-8')
         except Exception:
             pass
+        self.profile = self._fetch(sid)
+        if isinstance(self.profile, dict):
+            self.profile['channel'] = channel
+        self._remember_id()
+
+    def do_login(self, phone: str, code: str):
+        phone = re.sub(r'\D', '', phone or '')
+        code = (code or '').strip()
         try:
-            self.profile = self._fetch(sid)
+            sid, resp = phone_login(phone, code)
+        except Exception as e:
+            return {'ok': False, 'msg': '登录失败：%s' % str(e)[:100]}
+        try:
+            self._finish_login(sid, resp, phone)
         except Exception as e:
             return {'ok': False, 'msg': '已登录，但读取档案失败：%s' % str(e)[:100]}
-        self._remember_id()
-        return {'ok': True, 'msg': '✓ 登录成功，档案已生成', 'profile': self.profile}
+        note = ('（已接管登录：游戏客户端被服务器请下线，属正常）'
+                if getattr(self, '_took_over', False) else '')
+        return {'ok': True, 'msg': '✓ 登录成功，档案已生成' + note, 'profile': self.profile}
+
+    def do_login_pwd(self, phone: str, password: str):
+        """手机号 + 密码登录（SDK login_type=1）。
+
+        密码只在本机内存里过一遍：不打印、不写日志、不落盘
+        （save_token 只存下发的 accessToken，authorize 存档只记密码长度）。
+        """
+        phone = re.sub(r'\D', '', phone or '')
+        password = str(password or '')
+        if not phone or not password:
+            return {'ok': False, 'msg': '请把手机号和密码都填上'}
+        try:
+            sid, resp = password_login(phone, password)
+        except Exception as e:
+            return {'ok': False, 'msg': '登录失败：%s' % str(e)[:100]}
+        try:
+            self._finish_login(sid, resp, phone)
+        except Exception as e:
+            return {'ok': False, 'msg': '已登录，但读取档案失败：%s' % str(e)[:100]}
+        note = ('（已接管登录：游戏客户端被服务器请下线，属正常）'
+                if getattr(self, '_took_over', False) else '')
+        return {'ok': True, 'msg': '✓ 登录成功，档案已生成' + note, 'profile': self.profile}
+
+    # ── 渠道客户端登录（复用本机游戏里已登录的那张票，免验证码）──────
+    def _steam_log(self):
+        """本机有没有可用的 Steam 客户端登录记录（只读日志，很快）。"""
+        try:
+            ls = game_session.log_session('steam')
+        except Exception:
+            return None
+        if not ls or not ls.get('token'):
+            return None
+        ls['age_days'] = int((time.time() - ls['mtime']) / 86400)
+        ls['label'] = 'Steam 登录 · %s' % (ls.get('user') or ls.get('steam_id') or ls['masked'])
+        return ls
+
+    def steam_state(self):
+        """登录页用：本机在跑的渠道客户端 + 有没有 Steam 登录记录（都很快）。"""
+        try:
+            procs = game_session.list_game_processes()
+        except Exception as e:
+            return {'ok': False, 'running': False, 'procs': [], 'msg': str(e)[:80]}
+        ls = self._steam_log()
+        log = ({'user': ls.get('user') or '', 'log': ls.get('log_name', ''),
+                'age_days': ls['age_days'], 'label': ls['label']} if ls else None)
+        return {'ok': True, 'running': bool(procs), 'procs': procs, 'log': log,
+                'labels': '、'.join(sorted({p['label'] for p in procs}))}
+
+    def steam_account(self):
+        """登录页用：这次会登成哪个账号。
+
+        有客户端登录记录就直接用它 —— 快，而且**不必让游戏在线**；
+        没有记录才退回读进程内存（慢，约 30 秒）。
+        """
+        ls = self._steam_log()
+        if ls:
+            when = ('刚登录过' if ls['age_days'] < 1 else '%d 天前登录过' % ls['age_days'])
+            return {'ok': True, 'from_log': True,
+                    'sessions': [{'label': ls['label'], 'channel': '客户端登录记录',
+                                  'masked': ls.get('masked', ''), 'login_type': 'steam',
+                                  'time': ''}],
+                    'label': ls['label'], 'is_steam': True, 'channel': '客户端登录记录',
+                    'note': '（来自 %s，%s）' % (ls.get('log_name', '日志'), when)}
+        try:
+            sess, note = game_session.find_sessions()
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:80]}
+        if not sess:
+            return {'ok': False, 'none': True, 'msg': note or '没读到游戏登录态'}
+        items = [{'label': game_session.account_label(s) or '未知账号',
+                  'channel': s.get('label', ''), 'masked': s.get('masked', ''),
+                  'login_type': game_session.kind_of(s), 'time': s.get('time', '')}
+                 for s in sess]
+        # 与 steam_login 的取票口径保持一致：有 Steam 会话就以它为准
+        # （渠道会话不带时间戳，不能只靠"最新"排序挑，否则会挑到旧的手机号会话）
+        top = next((x for x in items if x['login_type'] == 'steam'), items[0])
+        return {'ok': True, 'sessions': items, 'label': top['label'],
+                'is_steam': top['login_type'].lower() == 'steam',
+                'channel': top['channel'], 'note': note}
+
+    def steam_login(self):
+        """用本机 Steam 渠道的登录态登录（免验证码）。
+
+        取票顺序：
+          ① 客户端日志里的长效票 —— 约 30 天有效，**不必让游戏在线** —— 首选
+          ② 运行中客户端的进程内存 —— 需要游戏在线，票是当前会话 —— 兜底
+        """
+        # ① 先试日志：不用开游戏，也不会把游戏挤下线
+        ls = self._steam_log()
+        log_failed = False
+        if ls:
+            sid = ''
+            try:
+                sid, resp = token_login(ls['token'])
+            except Exception:
+                sid = ''
+                log_failed = True            # 记录还在、票却被服务器拒 ⇒ 已失效
+            if sid:
+                try:
+                    self._finish_login(sid, resp, '', channel='steam')
+                except Exception as e:
+                    return {'ok': False, 'msg': '已登录，但读取档案失败：%s' % str(e)[:100]}
+                nick = str((self.profile or {}).get('nick') or '').strip()
+                return {'ok': True, 'profile': self.profile, 'account': ls['label'],
+                        'nick': nick, 'from_log': True,
+                        'msg': '✓ 已登录：%s%s'
+                               % (nick or ls['label'],
+                                  ('（%s）' % ls['label']) if nick else '')}
+        # ② 日志不可用（或票失效）才回退读内存：游戏正开着时还能救回来
+        try:
+            sess, note = game_session.find_sessions()
+        except Exception as e:
+            return {'ok': False, 'msg': '读取本机游戏登录态失败：%s' % str(e)[:80]}
+        if not sess:
+            if log_failed:
+                return {'ok': False, 'expired': True, 'need_login': True,
+                        'msg': '已失效，请重新登录一次'}
+            return {'ok': False, 'need_login': True,
+                    'msg': '没读到游戏登录态 —— 请先在游戏里登录一次，并保持游戏在线。'
+                           + (('（%s）' % note) if note else '')}
+        # 有 Steam 会话就优先用它（按钮写的就是"用 Steam 登录"）
+        s = next((x for x in sess if game_session.kind_of(x) == 'steam'), sess[0])
+        who = game_session.account_label(s) or '未知账号'
+        try:
+            sid, resp = token_login(s['token'], tel=str(s.get('phone') or ''))
+        except Exception as e:
+            if log_failed:
+                return {'ok': False, 'expired': True, 'need_login': True,
+                        'msg': '已失效，请重新登录一次'}
+            return {'ok': False, 'need_login': True, 'account': who,
+                    'msg': '登录失败（%s）：%s' % (who, str(e)[:110])}
+        try:
+            self._finish_login(sid, resp, str(s.get('phone') or ''),
+                               channel='steam')
+        except Exception as e:
+            return {'ok': False, 'msg': '已登录，但读取档案失败：%s' % str(e)[:100]}
+        warn = ('' if game_session.kind_of(s) == 'steam'
+                else '　注意：游戏当前不是 Steam 登录。')
+        # 登录成功后服务器会返回该号的昵称，比 Steam ID 更好认，直接显示
+        nick = str((self.profile or {}).get('nick') or '').strip()
+        note = ('（已接管登录：游戏客户端被服务器请下线，属正常）'
+                if getattr(self, '_took_over', False) else '')
+        return {'ok': True, 'profile': self.profile, 'account': who, 'nick': nick,
+                'msg': '✓ 已登录：%s%s%s%s'
+                       % (nick or who, ('（%s）' % who) if nick else '', note, warn)}
+
+    # ── B站 / TapTap 渠道登录（票都取自客户端日志，免验证码、也不必让游戏在线）──
+    def _chan_log_state(self, kind, name):
+        """登录页用：本机有没有可用的长效票（只读日志，很快）。"""
+        try:
+            s = game_session.log_session(kind)
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:80]}
+        if not s:
+            return {'ok': False, 'none': True, 'msg': '没有找到 %s 登录记录' % name}
+        days = int((time.time() - s['mtime']) / 86400)
+        when = ('（%d 天前登录）' % days) if days >= 1 else '（刚登录过）'
+        return {'ok': True, 'masked': s['masked'], 'user': s['user'], 'log': s['log_name'],
+                'ttl_days': int(s['ttl'] / 86400) if s['ttl'] else 30, 'age_days': days,
+                'label': '%s 登录 · %s%s' % (name, s['user'] or s['masked'], when)}
+
+    def _chan_log_login(self, kind, name, platform):
+        """用客户端日志里的长效票登录（免验证码；游戏在不在线都行）。"""
+        try:
+            s = game_session.log_session(kind)
+        except Exception as e:
+            return {'ok': False, 'msg': '读取 %s 登录记录失败：%s' % (name, str(e)[:80])}
+        if not s:
+            return {'ok': False, 'need_login': True,
+                    'msg': '没有找到 %s 登录记录 —— 请先用 %s 客户端登录一次《星趴》，'
+                           '登录记录会自动保存在本机。' % (name, name)}
+        who = '%s 登录 · %s' % (name, s['user'] or s['masked'])
+        try:
+            sid, resp = token_login(s['token'])
+        except Exception:
+            return {'ok': False, 'expired': True, 'need_login': True,
+                    'msg': '已失效，请重新登录一次'}
+        try:
+            self._finish_login(sid, resp, '', channel=kind)
+        except Exception as e:
+            return {'ok': False, 'msg': '已登录，但读取档案失败：%s' % str(e)[:100]}
+        # 档案里的 platform 是服务器给的默认值（往往写成 CN_STEAM），按渠道纠正
+        if isinstance(self.profile, dict):
+            self.profile['platform'] = platform
+        nick = str((self.profile or {}).get('nick') or '').strip()
+        note = ('（已接管登录：游戏客户端被服务器请下线，属正常）'
+                if getattr(self, '_took_over', False) else '')
+        return {'ok': True, 'profile': self.profile, 'account': who, 'nick': nick,
+                'msg': '✓ 已登录：%s%s%s'
+                       % (nick or who, ('（%s）' % who) if nick else '', note)}
+
+    def bili_state(self):
+        """B站：本机有没有可用的长效票。"""
+        return self._chan_log_state('bilibili', 'Bilibili')
+
+    def bili_login(self):
+        """用 B站客户端日志里的票登录。"""
+        return self._chan_log_login('bilibili', 'Bilibili', 'CN_BILIBILI')
+
+    def taptap_state(self):
+        """TapTap：本机有没有可用的长效票。"""
+        return self._chan_log_state('taptap', 'TapTap')
+
+    def taptap_login(self):
+        """用 TapTap 客户端日志里的票登录。"""
+        return self._chan_log_login('taptap', 'TapTap', 'CN_TAPTAP')
 
     def _fetch(self, sid):
         """登录握手 → 档案字典（登录成功后连接留着，给复盘查询复用）。"""
@@ -1474,9 +1712,33 @@ class Api:
         c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
         c.connect()
         ok = False
+        self._took_over = False       # 是否替用户接管了"被挤下线"的会话
         try:
-            s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
-                                extra=DEFAULT_EXTRA, client_ver='3.2.0')
+            # ★ 账号已经在别处（游戏客户端 / 上一次会话）在线时，服务器会先把旧会话
+            #   踢掉、并回一个 err=10020 的"登录被拒"；隔一两秒重发就通了 ——
+            #   用户手动"再点一次登录"走的就是这条路。这里替他自动重试，
+            #   顺手把那句"被拒"翻译成人话（err=10020 太抽象了）。
+            s2c = None
+            for _try in range(3):
+                try:
+                    s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
+                                        extra=DEFAULT_EXTRA, client_ver='3.2.0')
+                    self._took_over = _try > 0
+                    break
+                except C.ProtocolError as e:
+                    if '10020' not in str(e):
+                        raise
+                    if _try >= 2:
+                        raise C.ProtocolError(
+                            'err=10020：这个账号正在别处在线（游戏客户端或上次的会话）。'
+                            '同一个账号只能在线一处 —— 把游戏客户端退掉，再点一次登录就好。')
+                    time.sleep(1.2 + _try)
+                    try:
+                        c.close()     # 被踢之后连接可能已经废了，重连再发
+                    except Exception:
+                        pass
+                    c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
+                    c.connect()
             p = s2c.player
             # 结构（已对照离线握手包复核）：
             #   task.condition      = map<int,int>   → dict() 直接就是 {condType: 值}
@@ -1671,8 +1933,8 @@ def _selftest_helpers():
     for txt, want_kind, want_num in (
             ('1790337873289576', 'replay', '1790337873289576'),
             ("'1790337873289576'", 'replay', '1790337873289576'),   # 前端加引号防 JS 精度丢失
-            ('1007622', 'uid', '1007622'),
-            ('  1007622 ', 'uid', '1007622'),
+            ('1000001', 'uid', '1000001'),
+            ('  1000001 ', 'uid', '1000001'),
             ('', '', ''),
             ('123', '', '123')):
         k, n = Api._classify(txt)

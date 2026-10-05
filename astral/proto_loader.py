@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """吉星派对客户端协议 —— protobuf 描述符加载器
 
-描述符来自对客户端热更程序集 AstralParty.Runtime.dll 的逆向
-（见 assets/proto/*.pb，从游戏客户端 IL2CPP 元数据中抽取）
+描述符取自 assets/proto/*.pb，与客户端热更程序集
+AstralParty.Runtime.dll 中的定义一致
 """
 
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory

@@ -5,19 +5,20 @@
     send_code(tel)                  → 发验证码
     phone_login(tel, code)          → 返回 sid（同时把原始响应存盘，方便排查）
 """
+import hashlib
 import json
 import time
 from datetime import datetime
 
 from .sign import (APP_ID, GAME_VERSION, OS, SDK_VERSION,
-                   _post, authorize, pick, send_code)
+                   _post, authorize, device_id, pick, send_code)
 
 from astral import paths            # noqa: E402
 
 SAVE_DIR = paths.DATA_DIR
 
-# 从客户端内存 dump 提取的国服 PC 设备号，留空也能登录
-DEFAULT_DEVICE_ID = '42af3d79b18141711023754cad1aaf3cb418d45f'
+# 设备号按本机机器名推导（同一台机器恒定，不含任何硬编码的机器标识）
+DEFAULT_DEVICE_ID = device_id()
 DEFAULT_EXTRA = 'bn'
 
 
@@ -108,30 +109,25 @@ def _save(kind, note, payload):
         return None
 
 
-def phone_login(tel_num, code, channel='test_junhai', login_type='3', do_init=True):
-    """验证码登录 → (sid, 原始响应)
+def _submit(tel_num, secret, login_type, channel='test_junhai', do_init=True,
+            cred='smscode'):
+    """登录公共段：init → authorize → 存档（只记凭据长度，绝不写凭据本身）→ 取 sid。
 
-    短信验证码登录使用 login_type=3，验证码参数名为 smscode。
-    （login_type=2 为"带 access_token 的自动登录"，使用它会回"登录态过期"）
-
-    login_type: 3=短信验证码登录（用 smscode 传码）；2=带 access_token 的自动登录；
-                1=账密；4/7=短信注册；5=刷新登录态
-
-    参与签名的参数必须与服务器期望的完全一致；
-    多传一个参数（如 channel_id）会被算进签名，服务器回 signError。
-    这里只发 app_id / channel / code / login_type / os / tel_num / time。
-    登录前必须先调 /api/init，否则会回"操作不合法"。
+    login_type: 3=短信验证码（凭据字段 smscode）；1=手机号+密码（password）；
+                2=带 access_token 的自动登录；4/7=短信注册；5=刷新登录态
+    参与签名的参数必须与服务器期望的完全一致；多传一个参数（如 channel_id）
+    会被算进签名，服务器回 signError。登录前必须先调 /api/init，否则回"操作不合法"。
     返回的 sid 位于 content.authorize_code。
     """
     if do_init:
         sdk_init(channel)
-    r = authorize(tel_num, code, login_type=login_type, channel=channel)
+    r = authorize(tel_num, secret, login_type=login_type, channel=channel)
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     out = SAVE_DIR / ('authorize_%s.json' % stamp)
     out.write_text(json.dumps({
         'tel_masked': str(tel_num)[:3] + '****' + str(tel_num)[-2:],
-        'code_len': len(str(code)),
+        cred + '_len': len(str(secret)),        # 只记长度，凭据不落盘
         'login_type': login_type,
         'channel': channel,
         'resp': r,
@@ -147,13 +143,91 @@ def phone_login(tel_num, code, channel='test_junhai', login_type='3', do_init=Tr
     #   LoginHelper 打印的 sid 即该 authorize_code，故它排在取值列表首位。
     sid = pick(r,
                'content.authorize_code', 'authorize_code',
+               'content.access_token', 'data.access_token',   # 网页端 login_type=18 的写法
                'content.accessToken', 'data.accessToken',
                'content.0.sid', 'content.sid', 'data.sid',
                'content.0.authorize_code', 'data.authorize_code',
                'content.0.accessToken', 'content.0.token', 'data.token',
                'sid', 'accessToken')
     if not sid:
-        raise LoginError('登录返回里没找到 sid，原始响应已存 %s，请把该文件发我' % out.name)
+        raise LoginError('登录返回里没找到 sid（存档：%s）' % out.name)
+    return sid, r
+
+
+def phone_login(tel_num, code, channel='test_junhai', login_type='3', do_init=True):
+    """手机验证码登录（login_type=3，凭据字段 smscode）→ (sid, 原始响应)"""
+    return _submit(tel_num, code, login_type, channel, do_init,
+                   'password' if str(login_type) in ('1', '18') else 'smscode')
+
+
+def pwd_hash(plain):
+    """账号系统的密码摘要：md5(明文 + md5(明文))，小写十六进制。
+
+    出处是官方网页端自己的实现（se.feimogames.com 的 useApi-*.js，pwdLogin 原文
+    即 md5(e.password + md5(e.password))）；明文直发服务器只会回"密码错误"。
+    """
+    h1 = hashlib.md5(plain.encode('utf-8')).hexdigest()
+    return hashlib.md5((plain + h1).encode('utf-8')).hexdigest()
+
+
+def password_login(tel_num, password, channel='test_junhai', do_init=True):
+    """手机号 + 密码登录（login_type=18，凭据字段 password）→ (sid, 原始响应)
+
+    登录方式与密码摘要均由官网网页端源码确定（useApi-*.js 的 pwdLogin）：
+        { login_type: 18, tel_num, password: md5(p + md5(p)) } → POST /account/authorize
+    注意 login_type 是 18 而不是 1（用 1 恒回"密码错误"）。
+    明文密码只在本机内存里过一遍 —— 不打印、不写日志、不落盘，存档里只记长度。
+    """
+    sid, resp = _submit(tel_num, pwd_hash(str(password)), '18', channel, do_init, 'password')
+    # 18 只给 access_token，游戏协议要的是 authorize_code ⇒ 再走一次 login_type=2
+    # （与 Steam/B站/TapTap 复用渠道登录态完全同一条路）
+    tok = pick(resp, 'content.access_token', 'content.accessToken',
+               'data.access_token', 'data.accessToken', 'accessToken')
+    if not tok or str(sid).startswith('04'):        # 已经是 authorize_code 就不用再换
+        return sid, resp
+    return token_login(tok, tel_num, channel, do_init=True)
+
+
+def token_login(access_token, tel='', channel='test_junhai', do_init=True):
+    """用渠道客户端的会话票登录（login_type=2）→ (sid, 原始响应)
+
+    用途：复用本机渠道客户端（Steam 国服 / 国际服 / B站渠道…）已经登录的那张票，
+    免验证码进入协议。票由 astral/game_session.py 从运行中的游戏进程内存读取。
+
+    参数名必须为 access_token（写成 token 会被服务器回 signError）。
+    票一次一换：每次登录都会下发新的 accessToken，需存回 token.json 供下次使用。
+    tel 只影响 SDK 侧记录的账号，留空即可（票本身已带账号）。
+    """
+    if do_init:
+        sdk_init(channel)
+    r = authorize(tel, '', login_type='2', channel=channel, access_token=access_token)
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    out = SAVE_DIR / ('authorize_%s.json' % stamp)
+    out.write_text(json.dumps({
+        'login_type': '2',
+        'via': 'channel client token',
+        'token_masked': '%s…%s(%d位)' % (str(access_token)[:5], str(access_token)[-4:],
+                                        len(str(access_token))),
+        'channel': channel,
+        'resp': r,
+    }, ensure_ascii=False, indent=2), encoding='utf-8')
+
+    good, emsg = _check(r)
+    if not good:
+        raise LoginError('%s  (原始响应已存 %s)'
+                         % (emsg or json.dumps(r, ensure_ascii=False), out.name))
+
+    sid = pick(r,
+               'content.authorize_code', 'authorize_code',
+               'content.access_token', 'data.access_token',   # 网页端 login_type=18 的写法
+               'content.accessToken', 'data.accessToken',
+               'content.0.sid', 'content.sid', 'data.sid',
+               'content.0.authorize_code', 'data.authorize_code',
+               'content.0.accessToken', 'content.0.token', 'data.token',
+               'sid', 'accessToken')
+    if not sid:
+        raise LoginError('登录返回里没找到 sid（存档：%s）' % out.name)
     return sid, r
 
 
@@ -202,6 +276,7 @@ def save_token(resp, tel=''):
     """从登录响应里抠出 accessToken 存本地（只在本机，不外传）。"""
     tok = pick(resp, 'content.data.accessToken',   # 即为该路径
                'content.accessToken', 'data.accessToken',
+               'content.access_token', 'data.access_token',   # 网页端 login_type=18
                'content.0.accessToken', 'accessToken',
                'content.token', 'data.token')
     if not tok:
