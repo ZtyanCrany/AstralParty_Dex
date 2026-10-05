@@ -3,7 +3,7 @@
 **星趴档案** ｜ 中文 README → [README.md](README.md)
 
 > 《Astral Party》(CN server「吉星派对」)
-> Authors: **Nemophila & ZtyanCrany** ｜ Version **v1.2.0**
+> Authors: **Nemophila & ZtyanCrany** ｜ Version **v1.2.1**
 
 A tidy self-service tool: log in with your own account, then browse your profile, skin collection
 and recent matches, or look up a match by replay id / a player by UID — click any match to see each
@@ -71,7 +71,7 @@ difficulty.
 
 ![My Skins](screenshots/05-skins.png)
 
-**Login**
+**Login** — phone number with an SMS code or a password, plus Steam / Bilibili / TapTap channel logins; the session is remembered for auto login
 
 ![Login](screenshots/06-login.png)
 
