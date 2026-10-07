@@ -352,13 +352,12 @@ def fetch_replay_stats(replay_id):
 
     # 从最后一帧往前回扫：最后一个快照里可能有玩家数据被清空
     # （某个玩家 hero=0 / cond 缺失），所以每个玩家要取【最近一帧里非空】的那份统计。
+    # 帧起点按房号定位（房名不一定是 "match"：自定义房是玩家自取的名字）
+    from astral.replay import room_starts
+    starts = room_starts(data, replay_id)
     merged = {}
-    pos = len(data)
-    for _ in range(12):                      # 最多回扫 12 帧
-        k = data.rfind(b'\x12\x05match', 0, pos)
-        if k < 0:
-            break
-        pos = k
+    for s in reversed(starts[-12:]):         # 最多回扫 12 帧（自最后一帧往前）
+        k = s + 9                            # Room#2 房名：12 <len> <房名>
         room = _pb(data[k:])
         players = room.get(9) or []
         if not players:

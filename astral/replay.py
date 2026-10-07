@@ -24,7 +24,7 @@ from pathlib import Path
 
 from astral.proto_loader import msg_class
 
-ANCHOR = b'\x12\x05match'          # Room#2 = 房名（固定 "match"），用作帧起点特征
+ANCHOR = b'\x12\x05match'          # 老回放结构的帧起点特征（Room#2 房名恰为 "match"）
 CHIP_MIN, CHIP_MAX = 50001, 50093  # 真·筹码 ID 段
 COND_FIELDS = (
     'kill_count', 'kill_pve_monster', 'kill_thief',      # 击杀三件套
@@ -115,6 +115,48 @@ class Packet:
             self.cmd, self.uid, self.sn, self.frame, len(self.payload))
 
 
+def room_starts(d, replay_id=None):
+    """定位所有 Room 帧起点（房号字段 09 <房号 fixed64> 的位置）。
+
+    房名不固定：匹配局是 "match"，自定义房是玩家自取的名字（如「胖摩西」），
+    所以帧起点按房号匹配，而不是按房名。
+    回放号 = 时间戳(10位) + 房号(6位)，故优先用房号后 6 位；
+    拿不到回放号时，取文件里第一个「12 <len> <不含 NUL 的房名>」候选的房号；
+    都不行再退回老结构特征 ANCHOR。
+    """
+    if isinstance(replay_id, str) and replay_id.isdigit():
+        replay_id = int(replay_id)
+    key = None
+    if isinstance(replay_id, int) and replay_id >= 0:
+        k0 = (replay_id % 1000000).to_bytes(8, 'little')
+        if d.find(b'\x09' + k0 + b'\x12') >= 0:
+            key = k0
+    if key is None:
+        for m in re.finditer(rb'\x09.{8}\x12', d, re.S):
+            s = m.start()
+            ln = d[s + 10]
+            if 1 <= ln <= 64 and s + 11 + ln < len(d) and b'\x00' not in d[s + 11:s + 11 + ln]:
+                key = d[s + 1:s + 9]
+                break
+    if key is not None:
+        pat = b'\x09' + key + b'\x12'
+        out, i = [], 0
+        while True:
+            i = d.find(pat, i)
+            if i < 0:
+                break
+            out.append(i)
+            i += 1
+        if len(out) >= 3:
+            return out
+    out = []
+    for m in re.finditer(re.escape(ANCHOR), d):
+        s = m.start() - 9
+        if s >= 1 and d[s] == 0x09:               # Room 以 09 <房号 fixed64> 开头
+            out.append(s)
+    return out
+
+
 class Replay:
     def __init__(self, src, replay_id=None):
         if isinstance(src, (bytes, bytearray)):
@@ -132,14 +174,8 @@ class Replay:
 
     # ── 帧 ────────────────────────────────────────────────
     def _room_starts(self):
-        """帧起点 = "12 05 'match'" 的位置（Room#2 房名），且其前 9 字节须是 09 <房号 fixed64>"""
-        d = self.data
-        out = []
-        for m in re.finditer(re.escape(ANCHOR), d):
-            s = m.start() - 9
-            if s >= 1 and d[s] == 0x09:               # Room 以 09 <房号 fixed64> 开头
-                out.append(s)
-        return out
+        """帧起点（房号字段位置），房名与房号是否 "match" 无关 —— 见 room_starts()"""
+        return room_starts(self.data, self.replay_id)
 
     def _parse_frames(self):
         RoomMsg = msg_class('model.Room')
