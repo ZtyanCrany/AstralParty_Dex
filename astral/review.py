@@ -15,8 +15,11 @@
 """
 from __future__ import annotations
 
+import bisect
 import struct
+from pathlib import Path
 
+from astral.proto_loader import msg_class
 from astral.replay import (CHIP_MIN, CHIP_MAX, chip_name, chip_quality, pb,
                            pb_int, parse_replay)
 
@@ -335,6 +338,153 @@ def _player_chip_events(rp, uid, chips, all_groups):
     return events
 
 
+# ── 手牌 / 卡牌 ───────────────────────────────────────────
+# 卡牌只存在于每帧 Room 快照的 Hero#8 cards（repeated CardInfo）里；回放的协议包日志
+# 记不出「用了哪张、给了谁」⇒ 全部靠逐帧手牌差分：
+#   · 每轮开局手牌 = 该轮第一帧的非空手牌（已阵亡的玩家该轮为空）
+#   · 本轮获得     = 本轮首次出现、且不在开局手牌里的牌
+#   · 本轮用掉     = 最后出现帧落在该轮、且早于末帧的牌（末帧还拿在手上的不算出牌）
+# 注：牌「怎么来的」（商店/谁发的卡）回放里没有可靠记录，不要猜，界面上也不标。
+_CARDS = None
+_MSGS = {}
+
+
+def _msg(full_name):
+    """按全名取消息类并缓存（解析回放时反复要用）"""
+    if full_name not in _MSGS:
+        _MSGS[full_name] = msg_class(full_name)
+    return _MSGS[full_name]
+
+
+def card_table():
+    """{ID: {'name','type','desc','target','mode','from'}}（assets/data/cards.json）"""
+    global _CARDS
+    if _CARDS is None:
+        import json
+        from astral.paths import asset
+        try:
+            raw = json.loads(Path(asset('assets', 'data', 'cards.json')).read_text(encoding='utf-8'))
+            _CARDS = {int(c['id']): c for c in raw}
+        except Exception:
+            _CARDS = {}
+    return _CARDS
+
+
+def card_info(cid):
+    """卡牌 ID → 展示信息（表里查不到就退回原始 ID，不猜）"""
+    c = card_table().get(int(cid))
+    if not c:
+        return {'id': int(cid), 'name': '卡牌 %d' % cid, 'type': '', 'desc': ''}
+    return {'id': int(cid), 'name': c['name'], 'type': c.get('type', ''),
+            'desc': c.get('desc', '')}
+
+
+def _round_of(rooms, frame, uid):
+    """该帧该玩家显示第几轮（1 基）"""
+    if 0 <= frame < len(rooms):
+        for pl in rooms[frame].players:
+            if pl.id == uid:
+                return max(pl.hero.round, 0) + 1
+    return None
+
+
+def _read_len(b, i):
+    """读 varint（记录头 12 <len> 的长度位）"""
+    v, sh = 0, 0
+    while i < len(b) and sh < 64:
+        c = b[i]
+        v |= (c & 0x7f) << sh
+        i += 1
+        if c < 128:
+            return v, i
+        sh += 7
+    return None, i
+
+
+def _scan_rooms(rp):
+    """顺序切「12 <len>」记录，取出**完整**的 Room 帧（列表下标即帧号）。
+
+    Replay._parse_frames 用锚点匹配（要求 Room 首字段是 09 <房号>），一局只认出 28/387 条，
+    且 387 条里多数是残缺快照（有 player 没 hero）。残缺帧会把一张牌的「最后出现帧」
+    拉到末帧，导致后半局的出牌全被当成终局截断 —— 所以这里只收 4 个玩家都有 hero 的帧，
+    并且独立于既有解析路径，不动筹码那套。
+    """
+    d, n = rp.data, len(rp.data)
+    RoomMsg = _msg('model.Room')
+    out, i = [], 18
+    while i < n - 1:
+        if d[i] != 0x12:
+            i += 1
+            continue
+        ln, j = _read_len(d, i + 1)
+        if not ln or j + ln > n:
+            i += 1
+            continue
+        if d[j] == 0x09:
+            try:
+                rm = RoomMsg()
+                rm.ParseFromString(d[j:j + ln])
+            except Exception:
+                rm = None
+            if rm is not None and len(rm.players) and all(pl.hero.hero_id for pl in rm.players):
+                out.append(rm)
+        i = j + ln
+    return out
+
+
+def _card_life(rooms):
+    """{(uid, uniqueId): {'cid','first','last'}} —— 每张牌的存活区间"""
+    life = {}
+    for fi, rm in enumerate(rooms):
+        for pl in rm.players:
+            for c in pl.hero.cards:
+                k = (pl.id, c.uniqueId)
+                if k in life:
+                    life[k]['last'] = fi
+                else:
+                    life[k] = {'cid': c.cardId, 'first': fi, 'last': fi}
+    return life
+
+
+def _hand_snapshots(rooms):
+    """{轮次: {uid: [卡牌]}} —— 每轮取该玩家第一帧非空手牌（= 该轮开局手牌）"""
+    out = {}
+    for rm in rooms:
+        for pl in rm.players:
+            if not len(pl.hero.cards):
+                continue
+            r = max(pl.hero.round, 0) + 1
+            out.setdefault(r, {}).setdefault(pl.id, [card_info(c.cardId) for c in pl.hero.cards])
+    return out
+
+
+def _card_rounds(rooms, life, last_frame):
+    """[{'round': n, 'players': {uid: {'start': [], 'gets': [], 'uses': []}}}]"""
+    out = {r: {u: {'start': list(cs), 'gets': [], 'uses': []} for u, cs in snap.items()}
+           for r, snap in _hand_snapshots(rooms).items()}
+
+    def slot(r, uid):
+        return out.setdefault(0 if r is None else r, {}).setdefault(
+            uid, {'start': [], 'gets': [], 'uses': []})
+
+    for (uid, _cu), v in life.items():
+        s = slot(_round_of(rooms, v['first'], uid), uid)
+        if not any(c['id'] == v['cid'] for c in s['start']):
+            s['gets'].append(dict(card_info(v['cid']), frame=v['first']))
+        if v['last'] < last_frame:
+            slot(_round_of(rooms, v['last'], uid), uid)['uses'].append(
+                dict(card_info(v['cid']), frame=v['last']))
+    rows = []
+    for r in sorted(out):
+        row = {'round': r, 'players': {}}
+        for uid, d in out[r].items():
+            d['gets'].sort(key=lambda e: e['frame'])
+            d['uses'].sort(key=lambda e: e['frame'])
+            row['players'][str(uid)] = d
+        rows.append(row)
+    return rows
+
+
 # ── 每轮统计 ──────────────────────────────────────────────
 def _rounds_for(rp, uid):
     snaps = rp.cond_snapshots(uid)
@@ -368,6 +518,9 @@ def _rounds_for(rp, uid):
 def build_review(src, replay_id=None):
     rp = parse_replay(src, replay_id)
     all_groups = {u: _groups_by_frame(rp, u) for u in rp.players}
+    nick_of = {u: i.get('nick', '') for u, i in rp.players.items()}
+    rooms = _scan_rooms(rp)
+    card_rounds = _card_rounds(rooms, _card_life(rooms), max(len(rooms) - 1, 0))
     players = []
     for uid, info in rp.players.items():
         chips = rp.chips(uid)
@@ -415,5 +568,6 @@ def build_review(src, replay_id=None):
         'packets': len(rp.packets),
         'rounds': rp.round_count(),
         'missions': missions,
+        'card_rounds': card_rounds,
         'players': players,
     }

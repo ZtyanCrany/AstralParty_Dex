@@ -1,0 +1,614 @@
+[
+ {
+  "id": 10001,
+  "name": "攻击(中)",
+  "type": "Attack",
+  "target": "",
+  "desc": "战斗中攻击方可用\n攻击力+1~3",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10002,
+  "name": "防御(中)",
+  "type": "Defend",
+  "target": "",
+  "desc": "战斗中防御方可用\n防御力+1~3",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10003,
+  "name": "攻击(大)",
+  "type": "Attack",
+  "target": "",
+  "desc": "战斗中攻击方可用\n攻击力+1~6",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10004,
+  "name": "防御(大)",
+  "type": "Defend",
+  "target": "",
+  "desc": "战斗中防御方可用\n防御力+1~6",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10005,
+  "name": "攻击(特大)",
+  "type": "Attack",
+  "target": "",
+  "desc": "战斗中攻击方可用\n攻击力+1~10",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10006,
+  "name": "防御(特大)",
+  "type": "Defend",
+  "target": "",
+  "desc": "战斗中防御方可用\n防御力+1~10",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10007,
+  "name": "名刀：嘎呜切",
+  "type": "Attack",
+  "target": "",
+  "desc": "战斗中攻击方可用\n攻击力+1~20",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10008,
+  "name": "暗影突袭",
+  "type": "Attack",
+  "target": "",
+  "desc": "战斗中攻击方可用\n攻击力+3，本次攻击无法被反击",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10009,
+  "name": "蓄力",
+  "type": "Attack",
+  "target": "",
+  "desc": "攻击力+5，添加一张全力攻击到手牌中",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10010,
+  "name": "全力攻击",
+  "type": "Attack",
+  "target": "",
+  "desc": "攻击力+6，本次攻击的最终攻击力+50%",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 10011,
+  "name": "毒牙",
+  "type": "Attack",
+  "target": "",
+  "desc": "移除目标2层【金鳞】，本次攻击无法被反击",
+  "mode": "PVE",
+  "from": "地图卡牌:龙宫游乐园"
+ },
+ {
+  "id": 10012,
+  "name": "撕咬",
+  "type": "Attack",
+  "target": "",
+  "desc": "获得1层【觉醒】，本回合根据【觉醒】层数最多增加4点攻击力\n本次攻击无法被反击",
+  "mode": "PVE",
+  "from": "角色卡牌:真梦梓"
+ },
+ {
+  "id": 10013,
+  "name": "龙之咆哮",
+  "type": "Attack",
+  "target": "",
+  "desc": "攻击力+3，本次攻击无法被反击，并使得目标防御力-3，移动速度-9，持续1回合",
+  "mode": "PVE",
+  "from": "角色卡牌:真梦梓"
+ },
+ {
+  "id": 20001,
+  "name": "激光",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定6格内的敌方角色，造成3点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20002,
+  "name": "巧克力蛋糕",
+  "type": "Effect",
+  "target": "none",
+  "desc": "恢复自身2点生命值",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20003,
+  "name": "保护屏障",
+  "type": "Counter",
+  "target": "",
+  "desc": "被效果牌指定时可以使用，无效该效果",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20004,
+  "name": "钓鱼执法",
+  "type": "Effect",
+  "target": "Land",
+  "desc": "指定3格内的地块放置，停留的角色支付给放置者5星币",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20005,
+  "name": "遥控骰子",
+  "type": "Effect",
+  "target": "none",
+  "desc": "在1-6中选择一个数字，作为下次移动的最终点数",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20006,
+  "name": "以毒攻毒",
+  "type": "Effect",
+  "target": "none",
+  "desc": "自身立刻失去2点生命\n回合开始恢复3点生命值，持续2回合",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20007,
+  "name": "灵魂链接",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定两个角色，其中一个角色受到伤害时另一个角色承受同等伤害，持续3轮",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20008,
+  "name": "狂暴",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定10格内的角色使用，攻击力+3，受到伤害+1，持续2回合",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20009,
+  "name": "自爆",
+  "type": "Effect",
+  "target": "none",
+  "desc": "对自身造成3点伤害，对5格内的敌对角色造成5点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20010,
+  "name": "路障",
+  "type": "Effect",
+  "target": "Land",
+  "desc": "指定10格内的地块放置，经过的角色会停止移动",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20011,
+  "name": "方向抉择",
+  "type": "Effect",
+  "target": "none",
+  "desc": "自由选择移动方向",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20012,
+  "name": "皮筋弹弓",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定10格内的敌方角色，造成2点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20013,
+  "name": "板砖",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定3格内的敌方角色，造成5点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20014,
+  "name": "汉堡",
+  "type": "Effect",
+  "target": "none",
+  "desc": "恢复自身4点生命值",
+  "mode": "通用",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20015,
+  "name": "以牙还牙",
+  "type": "Counter",
+  "target": "",
+  "desc": "被效果牌指定时可以使用，反弹该效果",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20017,
+  "name": "错误的目标",
+  "type": "Counter",
+  "target": "",
+  "desc": "被效果牌指定时可以使用，将效果随机转移给其他敌对角色",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20018,
+  "name": "爆破专家",
+  "type": "Effect",
+  "target": "Land",
+  "desc": "指定3格内的地块放置，停留的角色受到3点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20019,
+  "name": "过期便当",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定6格内的角色，造成2点伤害。目标回合开始时，受到2点伤害，持续2回合\n效果移除后在目标所在的地块放置陷阱，停留时造成3点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20020,
+  "name": "丧心病狂",
+  "type": "Effect",
+  "target": "none",
+  "desc": "自身攻击力+5，持续1次攻击\n下次战斗时敌方角色无法选择闪避，如果没有击倒敌方角色，则自己被击倒",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20021,
+  "name": "传递炸弹",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "给下一位角色放置炸弹，回合开始时进行判定\n1点：受到99点伤害\n2-6点：传递给下一位角色",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20022,
+  "name": "抢夺",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一名敌方角色，夺取5星币",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20023,
+  "name": "拾荒",
+  "type": "Effect",
+  "target": "none",
+  "desc": "捡起3格内地块上掉落的星币",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20024,
+  "name": "随机传送门",
+  "type": "Effect",
+  "target": "",
+  "desc": "传送到随机【传送】地块上",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20025,
+  "name": "雪球攻击",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定9格内的一个敌方角色，造成1点伤害，且目标移动速度-4，持续1回合",
+  "mode": "PVP",
+  "from": "地图卡牌:礼物广场"
+ },
+ {
+  "id": 20026,
+  "name": "定向加速",
+  "type": "Effect",
+  "target": "none",
+  "desc": "自由选择移动方向。移动速度+3，持续1轮",
+  "mode": "PVP",
+  "from": "地图卡牌:礼物广场"
+ },
+ {
+  "id": 20027,
+  "name": "符卡-福",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一名角色，恢复2点生命值\n本回合自身出牌数+1",
+  "mode": "通用",
+  "from": "角色卡牌:风水师"
+ },
+ {
+  "id": 20028,
+  "name": "符卡-祸",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定10格内的一个敌方角色，造成1点伤害，回合结束时，如果在手牌中，使自身受到1点伤害",
+  "mode": "PVE",
+  "from": "角色卡牌:风水师"
+ },
+ {
+  "id": 20029,
+  "name": "符卡-祸",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定10格内的一个怪物，造成1点伤害，回合结束时，如果在手牌中，使自身受到1点伤害",
+  "mode": "PVP",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 20030,
+  "name": "活体书页",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定5格内的一个敌方角色，造成2点伤害，并施加1层【标记】。无法被反制牌反制",
+  "mode": "PVE",
+  "from": "角色卡牌:凛"
+ },
+ {
+  "id": 20032,
+  "name": "命运的指引",
+  "type": "Effect",
+  "target": "none",
+  "desc": "在1-6中选择一个数字，作为下次移动的最终点数\n主动技能冷却时间-1，本回合出牌数+1",
+  "mode": "PVE",
+  "from": "角色卡牌:蓝海晴"
+ },
+ {
+  "id": 20033,
+  "name": "强化拒止",
+  "type": "Effect",
+  "target": "Land",
+  "desc": "指定10格内的地块放置，经过的角色会停止移动，该角色下次移动时移动速度+2。",
+  "mode": "PVE",
+  "from": "角色卡牌:玲玲"
+ },
+ {
+  "id": 21001,
+  "name": "轨道炮",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定5格内的一个怪物，造成6点伤害",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21002,
+  "name": "你有我有",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个友方角色，自身和目标各获得1张卡牌",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21003,
+  "name": "加急加快",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个友方角色，目标移动时投掷2枚骰子，生效一次",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21004,
+  "name": "王之力",
+  "type": "Effect",
+  "target": "none",
+  "desc": "受到4点伤害，攻击力+5，持续3回合",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21005,
+  "name": "岿然不动",
+  "type": "Effect",
+  "target": "none",
+  "desc": "防御力+6，持续2轮",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21006,
+  "name": "奢华大餐",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个友方角色，对目标及附近3格内的所有友方角色恢复3点生命值",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21007,
+  "name": "定向爆破",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定6格内的一个怪物，对目标及附近2格内的所有怪物造成4点伤害",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21008,
+  "name": "支援",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个其他角色，传送到目标当前的位置",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21009,
+  "name": "高升炮",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定10格内的一个怪物，造成3点伤害，移除目标 且本轮目标无法反击",
+  "mode": "PVE",
+  "from": "地图卡牌:水乡古镇"
+ },
+ {
+  "id": 21010,
+  "name": "是他干的",
+  "type": "curse",
+  "target": "Entity",
+  "desc": "选择一个友方角色，造成1点伤害并施加【问题学生】，随后自身获得3星币。回合结束时如果本卡在手牌中，则自身受到1点伤害",
+  "mode": "PVE",
+  "from": "地图卡牌:魔法学院"
+ },
+ {
+  "id": 21012,
+  "name": "对怪激光",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定6格内的一个怪物，造成3点伤害",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21013,
+  "name": "对怪板砖",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定3格内的一个怪物，造成5点伤害",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21014,
+  "name": "支援口香糖",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个角色，恢复2点生命值，并移除【改造】\n自身本回合出牌数+1",
+  "mode": "PVE",
+  "from": "地图卡牌:幽魂暗巷"
+ },
+ {
+  "id": 21015,
+  "name": "能量补充棒",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个拥有【改造】的角色，攻击力+3，移动速度+2，持续2回合。随后对目标施加2层【改造】",
+  "mode": "PVE",
+  "from": "地图卡牌:幽魂暗巷"
+ },
+ {
+  "id": 21016,
+  "name": "大聪明软糖",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个角色获得3张卡牌，并移除【改造】",
+  "mode": "PVE",
+  "from": "地图卡牌:幽魂暗巷"
+ },
+ {
+  "id": 21017,
+  "name": "古怪的附灵物",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "抉择： 释放青魂；释放赤魂",
+  "mode": "PVE",
+  "from": "地图卡牌:御魂庆典"
+ },
+ {
+  "id": 21018,
+  "name": "释放青魂",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个怪物对自身发起攻击，随后对该怪物进行反击。本次交战中，怪物攻击力-3，防御力-3",
+  "mode": "PVE",
+  "from": "地图卡牌:御魂庆典"
+ },
+ {
+  "id": 21019,
+  "name": "释放赤魂",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "受到1点伤害，指定6格内的一个怪物，造成3点伤害。 移除自身的【青之诅咒】与【赤红之毒】，每移除一个，额外造成一次伤害",
+  "mode": "PVE",
+  "from": "地图卡牌:御魂庆典"
+ },
+ {
+  "id": 21020,
+  "name": "彩羽",
+  "type": "Effect",
+  "target": "Land",
+  "desc": "传送到5格内的地块，并恢复自身3点生命值",
+  "mode": "PVE",
+  "from": "地图卡牌:园林中庭"
+ },
+ {
+  "id": 21021,
+  "name": "振作起来",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "来自大家的鼓励！",
+  "mode": "PVE",
+  "from": "地图卡牌:园林中庭"
+ },
+ {
+  "id": 21022,
+  "name": "灰烬之羽",
+  "type": "curse",
+  "target": "",
+  "desc": "不能被使用。回合开始时,\n获得1层【温焰】。\n移除4层【温焰】：此卡转变为【彩羽】。",
+  "mode": "PVE",
+  "from": "地图卡牌:园林中庭"
+ },
+ {
+  "id": 21023,
+  "name": "吉星高照",
+  "type": "Effect",
+  "target": "none",
+  "desc": "本回合出牌数+8，获得888星币、88层星光，攻击力永久+8。所有角色回复88点生命值。",
+  "mode": "PVE",
+  "from": "地图卡牌:水乡古镇"
+ },
+ {
+  "id": 21024,
+  "name": "人机交融",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "指定一个角色，使目标获得1层【心智】\n\n自身本回合出牌数+1",
+  "mode": "PVE",
+  "from": "地图卡牌:决赛大赛场"
+ },
+ {
+  "id": 21025,
+  "name": "罪证嫌疑",
+  "type": "curse",
+  "target": "",
+  "desc": "指定一个友方角色，使目标获得1张【罪证嫌疑】\n回合结束时，如果在手牌中，消耗本卡牌，使自身获得1层【罪证】",
+  "mode": "PVE",
+  "from": "地图卡牌:异变图书馆"
+ }
+]

@@ -358,6 +358,82 @@ def chip_table():
     return _CHIPS
 
 
+_BUFFS = None
+
+
+def buff_table():
+    """{ID: {'name','desc'}}（assets/data/buffs.json，来自游戏 STRBuff 表）"""
+    global _BUFFS
+    if _BUFFS is None:
+        import json
+        from astral.paths import asset
+        try:
+            raw = json.loads(Path(asset('assets', 'data', 'buffs.json')).read_text(encoding='utf-8'))
+            _BUFFS = {int(k): v for k, v in raw.items()}
+        except Exception:
+            _BUFFS = {}
+    return _BUFFS
+
+
+def status_info(bid):
+    """状态/增益的显示信息 {name, desc, from}；查不到返回 None。
+
+    筹码自带的状态 buff_id = 筹码ID * 100 + 1（例：筹码 50001 → 5000101），
+    这类状态游戏里往往没有单独文案，回到筹码自己的名字与效果。
+    其余（技能/被动状态）查游戏 STRBuff 表；没有名字键的用「状态 <id>」兜底。
+    """
+    try:
+        bid = int(bid)
+    except (TypeError, ValueError):
+        return None
+    if 5000101 <= bid <= 5009301 and bid % 100 == 1:
+        cid = (bid - 1) // 100
+        c = chip_table().get(cid)
+        if c:
+            return {'name': c.get('name') or ('筹码 %d' % cid),
+                    'desc': c.get('desc') or '', 'from': 'chip', 'chip_id': cid}
+    b = buff_table().get(bid)
+    if b and (b.get('name') or b.get('desc')):
+        return {'name': b.get('name') or ('状态 %d' % bid),
+                'desc': b.get('desc') or '', 'from': 'buff'}
+    return None
+
+
+_MONSTERS = None
+
+
+def monster_table():
+    """{种类ID: {'name','desc'}}（assets/data/monsters.json，来自游戏 STRMonster 表）"""
+    global _MONSTERS
+    if _MONSTERS is None:
+        import json
+        from astral.paths import asset
+        try:
+            raw = json.loads(Path(asset('assets', 'data', 'monsters.json')).read_text(encoding='utf-8'))
+            _MONSTERS = {int(k): v for k, v in raw.items()}
+        except Exception:
+            _MONSTERS = {}
+    return _MONSTERS
+
+
+def monster_info(mid):
+    """怪物的显示信息 {name, desc}；查不到返回 None。
+
+    种类 ID 来自回放里的 monster.hero.hero_id；名字在游戏 STRMonster 表的 <id>*10(+0/1/2)。
+    """
+    try:
+        mid = int(mid)
+    except (TypeError, ValueError):
+        return None
+    return monster_table().get(mid)
+
+
+def monster_name(mid):
+    """怪物名（查不到回退成「怪物 <id>」）"""
+    info = monster_info(mid)
+    return (info or {}).get('name') or ('怪物 %s' % (mid,))
+
+
 def chip_name(cid):
     return chip_table().get(cid, {}).get('name', str(cid))
 

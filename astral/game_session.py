@@ -45,7 +45,7 @@ _TOKEN_RE = re.compile(rb'"[Aa]ccess_?[Tt]oken"\s*:\s*"([A-Za-z0-9_\-\.]{16,400}
 
 # 票前后邻域里能捡到的会话字段。
 # ★ 键一律写成【带引号的字面量】并显式列出各拼写 —— 用 [Cc]h_?[Uu]id 这类字符类
-#   简写在 bytes 模式下实测匹配不上（同段文本里 "chUid" 字面量却能匹配），字面量最稳。
+#   简写在 bytes 模式下匹配不上，字面量最稳。
 _SESSION_FIELDS = (
     (rb'"plat"', 'plat'),
     (rb'"LoginType"', 'login_type'), (rb'"login_type"', 'login_type'),

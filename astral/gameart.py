@@ -466,7 +466,7 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
         _save_state(st)
         say('头像资源已就绪（%d 项）' % len(need), len(need), len(need))
         return {'ok': True, 'game': True, 'reason': 'cached', 'found': 0,
-                'missing': len(need), 'total': len(need),
+                'missing': 0, 'total': len(need),
                 'seconds': round(time.time() - t0, 1), 'done': True}
 
     try:

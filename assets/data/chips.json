@@ -5,7 +5,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+1。",
   "style": "",
   "map_limit": []
  },
@@ -15,7 +15,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+2。",
   "style": "",
   "map_limit": []
  },
@@ -25,7 +25,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+5。",
   "style": "",
   "map_limit": []
  },
@@ -35,7 +35,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "移动速度+1。",
   "style": "",
   "map_limit": []
  },
@@ -45,7 +45,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "移动速度+2。",
   "style": "",
   "map_limit": []
  },
@@ -55,7 +55,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "移动速度+4。",
   "style": "",
   "map_limit": []
  },
@@ -65,7 +65,7 @@
   "quality": "蓝",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "生命值上限+2。",
   "style": "",
   "map_limit": []
  },
@@ -75,7 +75,7 @@
   "quality": "紫",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "生命值上限+3。",
   "style": "",
   "map_limit": []
  },
@@ -85,7 +85,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack,Tank",
-  "desc": "",
+  "desc": "生命值上限+3，自身每有2点额外生命值上限，攻击力+1。",
   "style": "",
   "map_limit": []
  },
@@ -95,7 +95,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack,Tank",
-  "desc": "",
+  "desc": "生命值为满时，攻击力+2，且攻击时额外上升层数的攻击力。",
   "style": "",
   "map_limit": []
  },
@@ -105,7 +105,17 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack,Tank",
-  "desc": "",
+  "desc": "生命值为满时，攻击力+4，且攻击时额外上升层数的攻击力。",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50012,
+  "name": "手电筒-一般",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "击倒怪物时，恢复2Hp。",
   "style": "",
   "map_limit": []
  },
@@ -115,7 +125,17 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击怪物时，每4层，使自身攻击力+1。击中怪物后，获得1。",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50014,
+  "name": "手电筒-爆闪",
+  "quality": "紫",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "攻击怪物时，获得1星币。每3层，使自身攻击力+1。",
   "style": "",
   "map_limit": []
  },
@@ -125,7 +145,7 @@
   "quality": "蓝",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "获得4。",
   "style": "",
   "map_limit": []
  },
@@ -135,7 +155,7 @@
   "quality": "紫",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "获得7。",
   "style": "",
   "map_limit": []
  },
@@ -145,7 +165,7 @@
   "quality": "金",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "获得3，所有角色轮次奖励星币+3。",
   "style": "",
   "map_limit": []
  },
@@ -155,7 +175,7 @@
   "quality": "蓝",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "防御力+1。",
   "style": "",
   "map_limit": []
  },
@@ -165,7 +185,7 @@
   "quality": "紫",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "防御力+2。",
   "style": "",
   "map_limit": []
  },
@@ -175,7 +195,7 @@
   "quality": "金",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "防御力+3。",
   "style": "",
   "map_limit": []
  },
@@ -185,7 +205,7 @@
   "quality": "蓝",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "回合开始时，获得1层。",
   "style": "",
   "map_limit": []
  },
@@ -195,7 +215,17 @@
   "quality": "金",
   "tag": "Tank",
   "tag_full": "Tank",
-  "desc": "",
+  "desc": "回合开始时，获得3层。",
+  "style": "",
+  "map_limit": []
+ },
+ {
+  "id": 50023,
+  "name": "肾上腺素-一般",
+  "quality": "金",
+  "tag": "Attack",
+  "tag_full": "Attack",
+  "desc": "生命值低于50%时，攻击力+3，且无法被反击。",
   "style": "",
   "map_limit": []
  },
@@ -205,7 +235,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "生命值低于50%时，攻击力+8，且无法被反击。",
   "style": "",
   "map_limit": []
  },
@@ -215,7 +245,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "主动技能冷却缩减1。",
   "style": "",
   "map_limit": []
  },
@@ -225,7 +255,7 @@
   "quality": "蓝",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "轮次奖励卡牌+1，商店卡牌的售价-1。",
   "style": "",
   "map_limit": []
  },
@@ -235,7 +265,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card,Tank",
-  "desc": "",
+  "desc": "每获得一张卡牌，获得1层。",
   "style": "",
   "map_limit": []
  },
@@ -245,7 +275,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card,Support",
-  "desc": "",
+  "desc": "出牌数+1。",
   "style": "",
   "map_limit": []
  },
@@ -255,7 +285,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "每使用3张效果牌，复制最后使用的那张效果牌并加入手牌。",
   "style": "",
   "map_limit": []
  },
@@ -265,7 +295,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "使用主动技能后，对6格内的怪物施加1层。",
   "style": "",
   "map_limit": []
  },
@@ -275,7 +305,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "回合结束时，如果自己手牌少于5张，获得1张卡牌。",
   "style": "",
   "map_limit": []
  },
@@ -285,7 +315,7 @@
   "quality": "蓝",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "使用效果牌对怪物造成伤害后，对目标施加1层。",
   "style": "",
   "map_limit": []
  },
@@ -305,7 +335,7 @@
   "quality": "金",
   "tag": "Tank",
   "tag_full": "Tank,Support",
-  "desc": "",
+  "desc": "回合开始时，5格内的所有角色获得1层并恢复1点生命值。",
   "style": "",
   "map_limit": []
  },
@@ -315,7 +345,7 @@
   "quality": "蓝",
   "tag": "Card",
   "tag_full": "Card,Support",
-  "desc": "",
+  "desc": "每使用2张效果牌，获得3星币。",
   "style": "",
   "map_limit": []
  },
@@ -325,7 +355,7 @@
   "quality": "蓝",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "自身移动的最终点数为8时，获得8星币。每有8点累计移动点数，获得1。",
   "style": "",
   "map_limit": []
  },
@@ -335,7 +365,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "你将一直受【青之诅咒】纠缠。每击倒一个怪物，攻击力永久+1。",
   "style": "",
   "map_limit": [
    82008
@@ -347,7 +377,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "拥有【青之诅咒】时:攻击力+5。拥有【赤红之毒】时:防御力+5。",
   "style": "",
   "map_limit": [
    82008
@@ -359,7 +389,7 @@
   "quality": "金",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "效果牌额外附加目标防御力的伤害。",
   "style": "",
   "map_limit": [
    82008
@@ -371,17 +401,17 @@
   "quality": "蓝",
   "tag": "Tank",
   "tag_full": "Tank,Support",
-  "desc": "",
+  "desc": "被攻击时，获得2层与3星币。",
   "style": "",
   "map_limit": []
  },
  {
   "id": 50041,
-  "name": "友情微章",
+  "name": "友情徽章",
   "quality": "紫",
   "tag": "Tank",
   "tag_full": "Tank,Support",
-  "desc": "",
+  "desc": "转账或治疗友方角色时，自身与目标同时获得2层。",
   "style": "",
   "map_limit": []
  },
@@ -391,7 +421,7 @@
   "quality": "蓝",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "转账时，自身与目标同时获得1与1星币。",
   "style": "",
   "map_limit": []
  },
@@ -401,7 +431,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack,Support",
-  "desc": "",
+  "desc": "获得5。攻击时，如果当前持有星币大于20，则额外增加当前持有星币30%的攻击力，随后消耗6星币。",
   "style": "",
   "map_limit": []
  },
@@ -411,7 +441,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击时先施加1层，本次攻击增加目标层数2倍的攻击力。",
   "style": "",
   "map_limit": []
  },
@@ -421,7 +451,7 @@
   "quality": "金",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "出牌数+1。对怪物使用伤害效果牌时，使怪物额外受到层数的伤害。",
   "style": "",
   "map_limit": []
  },
@@ -431,7 +461,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+1。回合开始时，对4格内最近的怪物施加1层。",
   "style": "",
   "map_limit": []
  },
@@ -441,7 +471,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "每回合一次，对拥有【标记】的怪物使用效果牌时，施加1层，复制使用的效果牌并返回手牌。",
   "style": "",
   "map_limit": []
  },
@@ -451,7 +481,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "使用主动技能后，获得1张卡牌，并对6格范围内的怪物施加1层。",
   "style": "",
   "map_limit": []
  },
@@ -461,7 +491,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+1。攻击茶壶时，攻击力+1，防御力+1，持续1轮。",
   "style": "",
   "map_limit": [
    82012
@@ -473,7 +503,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "效果牌射程+3，出牌数+1。",
   "style": "",
   "map_limit": [
    82012
@@ -485,7 +515,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+4，拥有【问题学生】时，防御力+4。",
   "style": "",
   "map_limit": [
    82012
@@ -497,7 +527,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+2，攻击时施加1层。",
   "style": "",
   "map_limit": []
  },
@@ -507,7 +537,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "受到伤害时，攻击力+1。回合开始时，失去1点攻击加成。",
   "style": "",
   "map_limit": [
    82007
@@ -519,7 +549,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "移动速度+2。每有15点累计移动点数，主动技能冷却时间-1。",
   "style": "",
   "map_limit": [
    82007
@@ -531,7 +561,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "使用主动技能时，使一名未被强化的友方角色攻击力+1，防御力+1。",
   "style": "",
   "map_limit": [
    82007
@@ -543,7 +573,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "使用效果牌时，受到1点伤害。获得卡牌时，回复1点生命值。",
   "style": "",
   "map_limit": [
    81005
@@ -555,7 +585,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "你的战斗骰点只会是1或者6点。",
   "style": "",
   "map_limit": [
    81005
@@ -567,7 +597,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "回合开始时，获得卡牌直至手牌达到8张。出牌数+1。",
   "style": "",
   "map_limit": [
    81005
@@ -579,7 +609,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "攻击骰点只会是6点，且无法被反击。",
   "style": "",
   "map_limit": [
    81005
@@ -591,7 +621,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "受到伤害后，使自身受到伤害-2、攻击力+2，持续1回合。",
   "style": "",
   "map_limit": [
    82013
@@ -603,7 +633,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "使用主动技能后，获得1层【反击】。反击时，攻击力、防御力永久+1。",
   "style": "",
   "map_limit": [
    82013
@@ -615,7 +645,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "获得【改造】时，额外获得1层。每2层【改造】，使自身攻击力+1。",
   "style": "",
   "map_limit": [
    82014
@@ -627,7 +657,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "被击倒后，进度不变，攻击力、防御力、生命值上限永久+1。",
   "style": "",
   "map_limit": [
    82014
@@ -639,7 +669,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "怪奇糖果机售价下降为3星币。使用糖果卡牌时，主动技能冷却时间-1。",
   "style": "",
   "map_limit": [
    82014
@@ -651,7 +681,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "闪避成功时，攻击力+1，最多叠加4层。",
   "style": "",
   "map_limit": []
  },
@@ -661,13 +691,13 @@
   "quality": "金",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "所有效果牌的射程+3。回合结束时，如果自身手牌数少于6张，则获得1张轨道炮。",
   "style": "",
   "map_limit": []
  },
  {
   "id": 50067,
-  "name": "彩羽手环",
+  "name": "飞羽手环",
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
@@ -707,7 +737,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "使用主动技能后，4格内的所有角色攻击力+1、受到伤害-1，持续1轮。",
   "style": "",
   "map_limit": [
    82010
@@ -719,7 +749,7 @@
   "quality": "金",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "使用高升炮后，出牌数+1。转账后获得1张高升炮。每使用3张高升炮，所有角色随机获得最多3种新春祝福。",
   "style": "",
   "map_limit": [
    82010
@@ -743,7 +773,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击力+1，攻击时，如果防御方的移动速度受到影响，攻击力额外+4。",
   "style": "",
   "map_limit": [
    83001,
@@ -757,7 +787,7 @@
   "quality": "金",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "被击倒后的下一轮开始时，立即复活。该轮怪物行动时，全体怪物被时间静止。随后本筹码变为时间怀表(破碎)。",
   "style": "",
   "map_limit": [
    83001,
@@ -807,7 +837,7 @@
   "quality": "紫",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "放过怪物后，对目标造成1点伤害并获得1。",
   "style": "",
   "map_limit": []
  },
@@ -817,9 +847,23 @@
   "quality": "金",
   "tag": "Support",
   "tag_full": "Support",
-  "desc": "",
+  "desc": "放过怪物后，对目标造成2点伤害并获得1，如果目标是首领，使目标额外受到层数的伤害。",
   "style": "",
   "map_limit": []
+ },
+ {
+  "id": 50080,
+  "name": "时间怀表(破碎)",
+  "quality": "金",
+  "tag": "Generic",
+  "tag_full": "Generic",
+  "desc": "它好像已经失去原本的功能，且看起来像是无法修复了。",
+  "style": "",
+  "map_limit": [
+   83001,
+   83002,
+   83003
+  ]
  },
  {
   "id": 50081,
@@ -827,7 +871,7 @@
   "quality": "蓝",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "效果牌伤害+1。",
   "style": "",
   "map_limit": []
  },
@@ -837,7 +881,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "生命值低于50%时，攻击力+4，受到伤害-1。",
   "style": "",
   "map_limit": []
  },
@@ -847,7 +891,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "获得3次强化筹码重选次数，3回合后选择并获得1个强化筹码。",
   "style": "",
   "map_limit": []
  },
@@ -857,7 +901,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "每累计5点移动点数，获得2层。层数大于5时，移动速度+1。",
   "style": "",
   "map_limit": []
  },
@@ -867,7 +911,7 @@
   "quality": "蓝",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "攻击命中后，获得2层，层数大于7时，攻击力+2。",
   "style": "",
   "map_limit": []
  },
@@ -897,7 +941,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "停留在怪物突击门或疾行时，获得2，并使得下次移动速度+2。",
   "style": "",
   "map_limit": []
  },
@@ -907,7 +951,7 @@
   "quality": "紫",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "",
+  "desc": "使用技能后，本回合出牌数+1，消耗5层：主动技能冷却时间-1。",
   "style": "",
   "map_limit": []
  },
@@ -937,7 +981,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "",
+  "desc": "每拥有1层【罪证】，攻击力+1、防御力+1，最高叠加4层。",
   "style": "",
   "map_limit": [
    82016

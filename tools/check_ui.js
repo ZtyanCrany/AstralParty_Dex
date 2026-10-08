@@ -21,6 +21,13 @@ if (i < 0) { console.log('✗ app.html 里找不到 window.renderReview'); proce
 const j = js.indexOf('\n  };', i);
 const src = js.slice(i, j + 5);
 
+// ②b 手牌视图（页签 + 每轮手牌矩阵 + 单人逐轮明细）也要一起跑，
+//     否则 renderReview 里调的 window.drawRv 找不到
+const i2 = js.indexOf('// ── 复盘页签 + 手牌视图');
+const j2 = js.indexOf('\n  };', js.indexOf('window.handDetail ='));
+if (i2 < 0 || j2 < 0) { console.log('✗ app.html 里找不到手牌视图（drawRv / handDetail）'); process.exit(1); }
+const src2 = js.slice(i2, j2 + 5);
+
 // ③ 最小 DOM 桩（renderReview 只用到 document / window.__esc / avOf）
 const mkEl = () => ({
   textContent: '', innerHTML: '', src: '', scrollTop: 0, className: '', style: {},
@@ -38,7 +45,7 @@ const window = {
     .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
 };
 const avOf = () => '';            // 头像兜底桩：本校验只看结构，不需要真图
-eval(src);                        // eslint-disable-line no-eval
+eval(src + '\n' + src2);          // eslint-disable-line no-eval
 
 // ④ 数据：默认取 userdata/review/ 里最新的那份缓存（顺序 / 质量由程序自己保证）
 const dir = path.join(ROOT, 'userdata', 'review');
@@ -81,6 +88,33 @@ chk('三选一：选中项涂色（cand pick q）', h.includes('cand pick q'));
 chk('刷新链有「刷新」分隔', h.includes('class="rf">刷新<'));
 chk('全篇无 emoji', !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(h));
 chk('全篇无「拿到」字样', !h.includes('拿到'));
+
+// ⑥ 手牌视图：页签 → 每轮开局手牌矩阵（每张卡一行）→ 点玩家切逐轮明细
+console.log('\n【手牌视图】');
+chk('有「手牌」页签', (store.rvTabs.innerHTML || '').includes('手牌'));
+window.rvTab('hand');
+const hm = store.rvBody.innerHTML;
+chk('默认是「每轮手牌」总览', hm.includes('每轮手牌'));
+chk('矩阵按轮次分行', /<th class="hrt">第 \d+ 轮<\/th>/.test(hm));
+chk('每个玩家一列表头（含头像 + 名字，可点）', /class="hpl" onclick="rvDetail\(/.test(hm));
+chk('每张卡占一行（td 里是块级 .hc）', /class="hc t-\w+"/.test(hm));
+chk('总览页只列「开局」、不显示获得/使用', hm.includes('>开局<') && !hm.includes('>获得<') && !hm.includes('>使用<'));
+chk('表格里不标牌来源（无「商店购买」「开局发放」字样）',
+  !/商店购买|开局发放|卡牌效果/.test(hm));
+chk('矩阵里没有出牌记录表', !hm.includes('出牌记录'));
+const uid2 = String(pl.uid);
+window.rvDetail(uid2);
+const hd = store.rvBody.innerHTML;
+chk('点玩家 → 该玩家逐轮明细', hd.includes('的逐轮明细'));
+chk('明细里有「开局」「获得」「使用」行',
+  hd.includes('>开局<') && hd.includes('>获得<') && hd.includes('>使用<'));
+chk('明细标题是「头像 + 名字」那一行（.rvtit；harness 里 avOf 是空桩故只验结构）',
+  /class="rvtit"/.test(hd));
+chk('明细：获得的牌用虚线框（.hc.dashed）', /class="hc t-\w+ dashed"/.test(hd));
+chk('明细：用掉的牌加划掉线（.hc.used）', /class="hc t-\w+ used"/.test(hd));
+chk('明细里有返回入口', hd.includes('rvbk'));
+chk('明细里没有走势图', !hd.includes('走势'));
+window.rvTab('stats');   // 还原，别影响后面的断言
 
 // ⑤ 占位头像：新角色/新皮肤在本机游戏里还没有图时，必须走「占位头像」，
 //    ★ 绝不能回落到 AV['Start'] —— 那是【地图的起点图标】，拿来当人物头像会让人一脸懵 ✗

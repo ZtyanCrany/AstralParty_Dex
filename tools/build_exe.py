@@ -21,6 +21,9 @@ CMD = [
     '--windowed',                      # 不弹控制台
     '--icon', str(ROOT / 'assets' / 'app.ico'),
     # 只读资源：界面 + 数据表 + 协议描述符
+    # 文案表（cards/chips/buffs/monsters…）随包分发：别人装了本软件就能直接看到名字与描述，
+    #   不需要本机装着游戏；只有 tools/sync_*_from_game.py 这类「从游戏重取文案」的同步工具
+    #   才需要本机装游戏（那是开发/维护时跑的事）。
     # 不打包 assets/avatars 与 assets/photos：
     #   美术改为运行时从「本机游戏资源包」提取（见 astral/gameart.py）：
     #     · 游戏以后出新角色/新皮肤，自动跟得上，不会像打进去的图那样过时；
@@ -90,6 +93,15 @@ def main() -> int:
         print('✗ 打包失败')
         return r.returncode
     out = ROOT / 'dist' / '星趴档案'
+    # assets/data 是整目录打包的，但 game_texts.json 只是「同步工具用的原始汇总」：
+    #   界面运行时只用各小表（cards/chips/buffs/monsters…），把它从产物里删掉，省 ~430KB，
+    #   也不必让软件包带着整包游戏原文（要重生成跑 tools/fetch_game_texts.py）。
+    for p in sorted(out.rglob('game_texts.json')):
+        try:
+            p.unlink()
+            print('  · 已从产物移除 %s' % p.relative_to(out))
+        except OSError as e:
+            print('  · 移除失败（可手动删）%s: %s' % (p, e))
     print()
     print('✓ 打包完成:', out)
     print('  可执行文件:', out / '星趴档案.exe')

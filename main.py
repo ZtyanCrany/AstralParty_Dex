@@ -564,7 +564,7 @@ def get_replay_file(replay_id):
 #   缓存版本：改动复盘数据结构（新增字段）后必须 +1，否则旧缓存会被直接复用，
 #   导致新增字段缺失、功能不生效（例如旧缓存里没有 skin 字段时，
 #   头像会全部回落到初始皮肤）。
-REVIEW_CACHE_VERSION = 4
+REVIEW_CACHE_VERSION = 9
 
 
 def build_review_cached(replay_id):
@@ -794,18 +794,74 @@ def _heroes_of(p):
 
     未拥有的角色也一并列出（名字取自静态角色表），带 owned=False，界面里发灰显示。
     这样新角色一上线就能看见「有这个人，但我还没有」，而不是整行消失。
-    未拥有的行不参与排行统计：场次/胜率/PVE 等级留空，潜能显示为「—」。
+    未拥有但服务器记过场次的角色会带上真实场次/胜场（只灰底、潜能留「—」），
+    保证排行榜之和能与档案里的「累计场次」对齐。
     """
     fc, wc = _pairs(p, 17), _pairs(p, 18)
     cards = getattr(p, 'roleCard', {}) or {}
+    # 场次以**角色卡自带的 fightCount** 为准，不用 task.condition1[17]：
+    # 后者是任务口径，个别角色会少记（逐角色相加比「累计参与」少十几局），
+    # fightCount 逐角色相加与「累计参与」严格相等。condition1 只兜底（未拥有的角色没有角色卡）。
+    fc_srv = dict(fc)          # 服务端 condition1[17] 原值：用来识别计数陈旧的联动角色
+    for _hid, _c in list(cards.items()):
+        try:
+            _v = int(getattr(_c, 'fightCount', 0) or 0)
+        except Exception:
+            continue
+        if _v:
+            fc[_hid] = _v
+    # 服务器计数里有、但既不在「拥有角色」也不在静态角色表里的角色：必须一并列出。
+    # 只遍历 cards|HERO 会把这类角色整个丢掉，正是「累计场次」与「角色场次之和」对不上的原因。
+    # 角色卡自带 fightCount（每角色累计场次），与 task.condition1[17] 是两个不同来源；
+    # 对不上时逐角色记一笔，便于定位「累计场次 vs 角色场次之和」的差额。
+    try:
+        from astral import gameart as _ga3
+        # 注意：fc 已被上面的 fightCount 覆盖，这里必须用 fc_srv 才能看出服务端原值
+        _fc2 = {k: int(getattr(v, 'fightCount', 0) or 0) for k, v in cards.items()}
+        _keys = set(cards) | set(fc_srv)
+        _diff = {}
+        for k in sorted(_keys):
+            c = _fc2.get(k, 0) if k in cards else None
+            if c != fc_srv.get(k, 0):
+                _diff[k] = '%s/%s' % ('-' if c is None else c, fc_srv.get(k, 0))
+        _ga3.log('角色场次对账：ΣfightCount=%d  Σcondition1[17]=%d  差=%d  服务端计数陈旧的角色(卡/条件)=%s'
+                 % (sum(_fc2.values()), sum(int(v) for v in fc_srv.values()),
+                    sum(_fc2.values()) - sum(int(v) for v in fc_srv.values()), _diff))
+    except Exception as _e:
+        pass
+    # 场次对账：累计(task.condition[14]) vs 角色之和(condition1[17]) vs 模式之和(mapModeCount)。
+    # 三个数不一致时，一眼就能看出 15 局差在哪一类，不用再猜。
+    try:
+        from astral import gameart as _ga2
+        _cond = dict(getattr(p.task, 'condition', {}) or {})
+        _mmc = sum(int(v) for v in (getattr(p, 'mapModeCount', {}) or {}).values())
+        _mmw = sum(int(v) for v in (getattr(p, 'mapModeWinCount', {}) or {}).values())
+        _ga2.log('对账：累计场次=%d 角色场次之和=%d 差=%d | 累计胜场=%d 角色胜场之和=%d 差=%d | 模式=%d/%d'
+                 % (int(_cond.get(14) or 0), sum(int(v) for v in fc.values()),
+                    int(_cond.get(14) or 0) - sum(int(v) for v in fc.values()),
+                    int(_cond.get(13) or 0), sum(int(v) for v in wc.values()),
+                    int(_cond.get(13) or 0) - sum(int(v) for v in wc.values()), _mmc, _mmw))
+    except Exception:
+        pass
+    missed = sorted((set(fc) | set(wc)) - set(cards) - set(HERO))
+    if missed:
+        try:
+            from astral import gameart as _ga
+            _ga.log('角色统计：补回 %d 个未登记角色 %s'
+                    % (len(missed), {k: fc.get(k, 0) for k in missed}))
+        except Exception:
+            pass
     heroes = []
-    for hid in sorted(set(cards) | set(HERO)):
+    for hid in sorted(set(cards) | set(HERO) | set(fc) | set(wc)):
         card = cards.get(hid)
         # ── 未拥有：只列名字与称号，其余留空 ──
         if card is None:
+            # 没这张角色卡：名字回退静态表；但服务器既然记了场次就如实显示，
+            # 否则排行榜之和永远对不上「累计场次」。
             heroes.append({'id': hid, 'name': HERO.get(hid, '角色#%d' % hid),
-                           'title': TITLE.get(hid, ''), 'n': 0, 'w': 0,
-                           'lv': None, 'brk': '—', 'owned': False})
+                           'title': TITLE.get(hid, ''), 'n': fc.get(hid, 0),
+                           'w': wc.get(hid, 0), 'lv': None, 'brk': '—',
+                           'owned': False, 'stale': False})
             continue
         n = fc.get(hid, 0)
         if not n and not card.isBreakThrough:
@@ -835,7 +891,9 @@ def _heroes_of(p):
         heroes.append({'id': hid, 'name': HERO.get(hid, '角色#%d' % hid),
                        'title': TITLE.get(hid, ''), 'n': n,
                        'w': wc.get(hid, 0), 'lv': _lv,
-                       'brk': _pot, 'owned': True})
+                       'brk': _pot, 'owned': True,
+                       # 角色卡的 fightCount 与服务端条件计数不一致 ⇒ 该角色的服务端胜场统计少算
+                       'stale': bool(fc_srv.get(hid, 0) != fc.get(hid, 0))})
     # 已拥有在前（按场次、编号），未拥有在后（按编号）
     heroes.sort(key=lambda h: (0 if h.get('owned') else 1, -h['n'], h['id']))
 

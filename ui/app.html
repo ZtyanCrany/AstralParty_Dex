@@ -325,6 +325,52 @@
   .rtag{ font-size:10.5px; padding:2px 7px; border-radius:6px; background:#EFE9DC;
          color:#8A8377; }
   .rvfoot{ font-size:11.5px; color:#B0A995; line-height:1.9; }
+  /* 复盘页签 + 手牌视图（每轮手牌总览 / 单人逐轮明细） */
+  .rvtabs{ display:flex; gap:20px; padding:0 20px; background:#FBF8F2;
+           border-bottom:1px solid var(--line); }
+  .rvtabs .rvt{ font-size:12.5px; color:#8A8377; padding:9px 1px 8px;
+                cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .rvtabs .rvt:hover{ color:#B4633A; }
+  .rvtabs .rvt.on{ color:#4E4739; font-weight:700; border-bottom-color:#C6A15B; }
+  .rvhint{ font-size:11.5px; color:#B0A995; }
+  .htab{ width:calc(100% - 12px); border-collapse:collapse; table-layout:fixed; }
+  .htab th, .htab td{ border-bottom:1px solid #F1ECE2; vertical-align:top;
+                      padding:7px 6px 7px 0; }
+  .htab thead th{ border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .htab th.hrt{ width:56px; font-size:11.5px; font-weight:600; color:#B0A995; text-align:left; }
+  .htab tbody th.hrt{ color:#5E574A; }
+  .hpl{ display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 4px;
+        border-radius:8px; }
+  .hpl:hover{ background:#F3EEE3; }
+  .hpl .hav{ width:26px; height:26px; border-radius:50%; object-fit:contain; flex:0 0 26px; }
+  .hpl .hnm{ font-size:12px; color:#4E4739; font-weight:600; white-space:nowrap;
+             overflow:hidden; text-overflow:ellipsis; }
+  .hpl:hover .hnm{ color:#B4633A; }
+  .hc{ display:inline-block; border-radius:7px; padding:2px 8px; font-size:11.5px;
+       background:#F2EEE4; border:1px solid #E7E0D2; color:#5E574A; white-space:nowrap; }
+  .htab td .hc{ display:block; width:fit-content; max-width:100%; margin-bottom:3px; }
+  .htab td .hc:last-child{ margin-bottom:0; }
+  .hc.dashed{ background:#FBF8F2; border-style:dashed; border-color:#CFC6B2; color:#8A8377; }
+  .hc.used{ background:#F4F1EA; border-color:#E4DDCC; color:#A79F91; text-decoration:line-through; }
+  .hc.t-Attack{ background:#FBEFE7; border-color:#F0D9C8; color:#A9542C; }
+  .hc.t-Defend{ background:#EAF0F7; border-color:#D6E1EE; color:#44638C; }
+  .hc.t-Effect{ background:#E9F4EA; border-color:#D3E7D6; color:#3D7A50; }
+  .hgrp{ margin-bottom:7px; }
+  .hgrp:last-child{ margin-bottom:0; }
+  .hlab{ display:block; font-size:10.5px; color:#B0A995; margin-bottom:3px;
+         letter-spacing:.2px; white-space:nowrap; }
+  .rvtit{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .rvtit .hav{ width:22px; height:22px; border-radius:50%; object-fit:contain; }
+  .hc.t-Counter{ background:#EDF5F1; border-color:#D8E9E1; color:#3F7A65; }
+  .hc.t-curse{ background:#F6EDEC; border-color:#EAD8D5; color:#96574F; }
+  .crow{ display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
+  .crow .rf{ font-size:11px; font-weight:600; flex:0 0 auto; min-width:30px;
+             white-space:nowrap; }
+  .crow .rf.st{ color:#8A8377; }
+  .crow .rf.gt{ color:#3F8C7A; }
+  .crow .rf.ut{ color:#B4633A; }
+  .crow .rsrc{ font-size:11.5px; color:#A79F91; }
+  .rvbk{ font-size:11.5px; color:#B4633A; cursor:pointer; font-weight:600; margin-right:6px; }
   /* 获取筹码明细：来源文字用颜色区分（不用 emoji）+ 刷新链 */
   .src-txt{ font-size:12px; font-weight:600; }
   .src-txt.s-star{ color:#A66BD6; }
@@ -395,6 +441,16 @@
   /* 角色列表里「未拥有」的行整体发灰（与皮肤列表同一套观感） */
   #heroes tr.noh{ opacity:.5; }
   #heroes tr.noh:hover{ opacity:.8; }
+  /* 服务端统计少算的角色：胜场/胜率后一个小问号点，悬停出自绘提示 */
+  .qstale{ position:relative; display:inline-flex; align-items:center; justify-content:center;
+           width:13px; height:13px; margin-left:5px; border-radius:50%; background:#C0453A; color:#fff;
+           font-size:9px; font-style:normal; font-weight:700; line-height:1; vertical-align:1px;
+           cursor:help; }
+  .qstale::after{ content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 6px);
+           transform:translateX(-50%); background:#3A342C; color:#F5F1E8; font-size:11px; font-weight:400;
+           padding:4px 8px; border-radius:6px; white-space:nowrap; opacity:0; pointer-events:none;
+           transition:opacity .12s; z-index:30; }
+  .qstale:hover::after{ opacity:1; }
   /* ── 排序小图标按钮（内联 SVG，无 emoji） ── */
   .sbtn{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px;
          margin-left:4px; vertical-align:-0.5px; border-radius:4px; cursor:pointer; color:#BEB29A;
@@ -451,6 +507,7 @@
       </div>
       <div class="rx" onclick="closeReview()">✕</div>
     </div>
+    <div class="rvtabs" id="rvTabs"></div>
     <div class="rvbody" id="rvBody"></div>
   </div>
 </div>
@@ -1021,6 +1078,8 @@ window.paintHeroes = () => {
       || ((Number(a.id) || 0) - (Number(b.id) || 0));       // 再并列：按编号，保证顺序稳定
   });
   const max = Math.max(...rows.map(h => h.n), 1);
+  // 服务端胜场统计少算的角色（角色卡场次与服务端条件计数对不上）在胜场/胜率后标一个问号点
+  const STALE2 = '<span class="qstale" data-tip="该角色的服务端胜场统计少算">?</span>';
   document.getElementById('heroes').innerHTML = rows.map(h=>`<tr${h.owned===false?' class="noh"':''}>
       <td>
         <div class="hero-name">
@@ -1032,8 +1091,8 @@ window.paintHeroes = () => {
         </div>
       </td>
       <td class="num">${h.n||'—'}</td>
-      <td class="num">${h.w||'—'}</td>
-      <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}</td>
+      <td class="num">${h.w||'—'}${h.stale?STALE2:''}</td>
+      <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}${h.stale?STALE2:''}</td>
       <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
       <td class="num">${h.owned===false?'—':(h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>'))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
@@ -1303,15 +1362,113 @@ function render(d){
       revs += blk;
     });
 
-    document.getElementById('rvBody').innerHTML =
-      '<div class="rvsec"><h4>轮次数据</h4>' + tab + '</div>' +
-      '<div class="rvsec"><h4>筹码总览（' + (p.chips || []).length + ' 个）</h4><div class="chips">' +
-        chips + '</div></div>' +
-      '<div class="rvsec"><h4>获取筹码明细</h4>' +
-        (revs || '<div class="rvfoot">本局没有拿筹码记录</div>') + '</div>';
-    // ★ 每次打开都回到顶部（否则关掉再开（含看别的玩家）会停在上一处滚动位置 ✗）
-    const _rb = document.getElementById('rvBody');
-    if (_rb) _rb.scrollTop = 0;
+    // 页签用：把现成的两块内容缓存住，切页签 / 切手牌视图时复用
+    window.__rvState = {
+      rv: rv, uid: String(uid), tab: 'stats', detail: null,
+      stats: {tab: tab, chips: chips, revs: revs, nchip: (p.chips || []).length}
+    };
+    window.drawRv();
+  };
+
+  // ── 复盘页签 + 手牌视图 ──
+  //  手牌页签默认看「每轮手牌」总览：行=轮次、列=玩家，每格三组
+  //  开局 / 获得 / 使用（每张卡占一行）；点玩家头像/名字切到他的逐轮明细。
+  window.drawRv = () => {
+    const S = window.__rvState;
+    if(!S) return;
+    document.getElementById('rvTabs').innerHTML =
+      [['stats','对局统计'],['hand','手牌']].map(t =>
+        '<a class="rvt' + (S.tab === t[0] ? ' on' : '') +
+        '" onclick="rvTab(\'' + t[0] + '\')">' + t[1] + '</a>').join('');
+    let html;
+    if(S.tab === 'stats'){
+      const c = S.stats;
+      html = '<div class="rvsec"><h4>轮次数据</h4>' + c.tab + '</div>' +
+             '<div class="rvsec"><h4>筹码总览（' + c.nchip + ' 个）</h4><div class="chips">' +
+               c.chips + '</div></div>' +
+             '<div class="rvsec"><h4>获取筹码明细</h4>' +
+               (c.revs || '<div class="rvfoot">本局没有拿筹码记录</div>') + '</div>';
+    }else if(S.detail){
+      html = window.handDetail(S.rv, S.detail);
+    }else{
+      html = window.handMatrix(S.rv);
+    }
+    const b = document.getElementById('rvBody');
+    b.innerHTML = html;
+    b.scrollTop = 0;   // 切页签 / 切视图都回到顶部，别停在上一处滚动位置
+  };
+  window.rvTab = (t) => { window.__rvState.tab = t; window.__rvState.detail = null; window.drawRv(); };
+  window.rvDetail = (uid) => {   // 顺带切到「手牌」页签：从统计页调用也能直接看明细
+    window.__rvState.tab = 'hand'; window.__rvState.detail = String(uid); window.drawRv(); };
+  window.rvBack = () => { window.__rvState.detail = null; window.drawRv(); };
+
+  // A：每轮手牌总览（行 = 轮次，列 = 玩家，每格：开局 / 获得 / 使用）
+    // A：每轮总览（行 = 轮次，列 = 玩家；每格三组：开局 / 获得 / 使用）
+  //    ★ 牌「怎么来的」（商店/谁发的卡）回放里没有可靠记录 ⇒ 一律不标来源，只列牌。
+  window.handMatrix = (rv) => {
+    const esc = window.__esc;
+    const ps = rv.players || [];
+    const rows = rv.card_rounds || [];
+    if(!rows.length)
+      return '<div class="rvsec"><h4>每轮手牌</h4>' +
+             '<div class="rvfoot">这局回放没解析到手牌数据</div></div>';
+    const grp = (label, cs) => (!cs || !cs.length) ? '' :
+      '<div class="hgrp"><span class="hlab">' + label + '</span>' +
+      cs.map(c => '<span class="hc t-' + esc(c.type || 'x') + '">' + esc(c.name) + '</span>').join('') +
+      '</div>';
+    let head = '<tr><th class="hrt">轮次</th>';
+    ps.forEach(p => {
+      const av = avOf(p.hero_id);
+      head += '<th><div class="hpl" onclick="rvDetail(\'' + p.uid + '\')" ' +
+        'title="点开看这个玩家的逐轮明细">' +
+        (av ? '<img class="hav" src="' + esc(av) + '" onerror="this.style.display=\'none\'">'
+            : '<span class="hav"></span>') +
+        '<span class="hnm">' + esc(p.nick) + '</span></div></th>';
+    });
+    let body = '';
+    rows.forEach(r => {
+      body += '<tr><th class="hrt">第 ' + r.round + ' 轮</th>';
+      ps.forEach(p => {
+        const d = (r.players || {})[String(p.uid)] || {};
+        body += '<td>' + (grp('开局', d.start) || '<span class="rvfoot">—</span>') + '</td>';
+      });
+      body += '</tr>';
+    });
+    return '<div class="rvsec"><h4>每轮手牌</h4>' +
+      '<div class="rvhint" style="margin:-2px 0 8px 12px">' +
+      '点玩家头像或名字，看他的逐轮明细</div>' +
+      '<table class="htab"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>' +
+      '</div></div>';
+  };
+
+  // B：单人逐轮明细（每轮：开局 / 获得 / 使用）
+  window.handDetail = (rv, uid) => {
+    const esc = window.__esc;
+    const p = (rv.players || []).find(x => String(x.uid) === String(uid));
+    if(!p)
+      return '<div class="rvsec"><div class="rvfoot">没找到这个玩家</div></div>';
+    const av = avOf(p.hero_id);
+    // label 与卡牌同一行（不换行）；获得用虚线框、使用用划掉线
+    const row = (label, cls, cs, extra) => (!cs || !cs.length) ? '' :
+      '<div class="crow"><span class="' + cls + '">' + label + '</span>' +
+      cs.map(c => '<span class="hc t-' + esc(c.type || 'x') + (extra ? ' ' + extra : '') + '">' +
+                  esc(c.name) + '</span>').join('') +
+      '</div>';
+    let out = '<div class="rvsec"><h4 class="rvtit">' +
+      '<a class="rvbk" onclick="rvBack()">\u2039 每轮手牌</a>' +
+      (av ? '<img class="hav" src="' + esc(av) + '" onerror="this.style.display=\'none\'">' : '') +
+      '<span>' + esc(p.nick) + ' 的逐轮明细</span></h4>';
+    let any = false;
+    (rv.card_rounds || []).forEach(r => {
+      const d = (r.players || {})[String(uid)] || {};
+      if(!(d.start || []).length && !(d.gets || []).length && !(d.uses || []).length) return;
+      any = true;
+      out += '<div class="rd"><h5>第 ' + r.round + ' 轮</h5>' +
+             row('开局', 'rf st', d.start) + row('获得', 'rf gt', d.gets, 'dashed') +
+             row('使用', 'rf ut', d.uses, 'used') + '</div>';
+    });
+    if(!any) out += '<div class="rvfoot">这局没有解析到这个玩家的手牌记录</div>';
+    return out;
   };
 }
 
