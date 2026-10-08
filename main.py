@@ -352,7 +352,7 @@ def fetch_replay_stats(replay_id):
 
     # 从最后一帧往前回扫：最后一个快照里可能有玩家数据被清空
     # （某个玩家 hero=0 / cond 缺失），所以每个玩家要取【最近一帧里非空】的那份统计。
-    # 帧起点按房号定位（房名不一定是 "match"：自定义房是玩家自取的名字）
+    # 帧起点按房号定位（房名不一定是 "match"）
     from astral.replay import room_starts
     starts = room_starts(data, replay_id)
     merged = {}
@@ -1295,8 +1295,7 @@ class Api:
         登录包已含所需的一切：Player.level / showPlayer.record / praiseNum、
         task.condition[14 = 场次, 13 = 胜场]，所以这条路不用再发任何请求。
 
-        refresh=True 时无视手里那份档案、重新握手一次：最近对局只在登录包里，
-        软件开着的话刚打完那局不会自己出现（界面的刷新按钮走的就是这条路）。
+        refresh=True 时无视手里那份档案、重新握手一次（原因见 refresh_profile）。
         """
         prof = self.profile
         if refresh or not prof or str(prof.get('uid')) != str(uid):

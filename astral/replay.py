@@ -173,14 +173,10 @@ class Replay:
         self._parse_packets()
 
     # ── 帧 ────────────────────────────────────────────────
-    def _room_starts(self):
-        """帧起点（房号字段位置），房名与房号是否 "match" 无关 —— 见 room_starts()"""
-        return room_starts(self.data, self.replay_id)
-
     def _parse_frames(self):
         RoomMsg = msg_class('model.Room')
         d = self.data
-        starts = self._room_starts()
+        starts = room_starts(d, self.replay_id)
         for idx, s in enumerate(starts):
             ln = None
             for back in (3, 2, 1, 4, 5):
