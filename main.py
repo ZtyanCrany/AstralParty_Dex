@@ -1289,14 +1289,17 @@ class Api:
         except Exception:
             return ''
 
-    def _query_self(self, uid):
+    def _query_self(self, uid, refresh=False):
         """查自己：服务器会丢弃 5153，直接用登录握手包里的档案拼一份结果。
 
         登录包已含所需的一切：Player.level / showPlayer.record / praiseNum、
         task.condition[14 = 场次, 13 = 胜场]，所以这条路不用再发任何请求。
+
+        refresh=True 时无视手里那份档案、重新握手一次：最近对局只在登录包里，
+        软件开着的话刚打完那局不会自己出现（界面的刷新按钮走的就是这条路）。
         """
         prof = self.profile
-        if not prof or str(prof.get('uid')) != str(uid):
+        if refresh or not prof or str(prof.get('uid')) != str(uid):
             sid, why = _auto()
             if not sid:
                 return {'ok': False, 'kind': 'uid', 'uid': uid,
@@ -1336,8 +1339,11 @@ class Api:
                     'praiseNum': int(prof.get('praise') or 0)},
                 'records': recs}
 
-    def query(self, text):
-        """复盘查询：回放号 → 单条对局记录；UID → 最近 10 局记录。"""
+    def query(self, text, refresh=False):
+        """复盘查询：回放号 → 单条对局记录；UID → 最近 10 局记录。
+
+        refresh=True（界面的刷新按钮）时，「查自己」那条会重新握手，取到最新对局。
+        """
         kind, s = self._classify(text)
         if not kind:
             return {'ok': False, 'msg': '请输入回放号（16 位长数字）或 UID（6~7 位数字）'}
@@ -1373,7 +1379,7 @@ class Api:
             # 「查自己」会被服务器丢弃 5153（见 _fetch 里的注释）。登录与否都一样，
             # 因为这条查询本身就用本机记住的票登录，服务器看到的会话 uid 就是你自己。
             # ⇒ 不发 5153，直接用登录握手包里的档案作答。
-            return self._query_self(uid)
+            return self._query_self(uid, refresh)
         sp, last = None, ''
         for attempt in (1, 2):
             try:
@@ -1464,6 +1470,27 @@ class Api:
         self._remember_id()
         return {'ok': True, 'msg': '✓ 已用记住的登录态登录，免验证码',
                 'profile': self.profile}
+
+    def refresh_profile(self):
+        """重新登录一次并返回最新档案（「最近对局」的刷新按钮）。
+
+        最近对局只在登录握手包里（showPlayer.record[10]），软件一直开着时不会自己更新，
+        所以打完一把要重开软件才看得到；这一步相当于把软件重开一次，但不用真的重开。
+        """
+        try:
+            sid, why = _auto()
+        except Exception as e:
+            sid, why = None, str(e)[:60]
+        if not sid:
+            return {'ok': False, 'msg': why or '登录态不可用，请先用验证码登录一次'}
+        try:
+            prof = self._fetch(sid)      # 内部先丢掉旧连接，再重新握手
+        except Exception as e:
+            return {'ok': False, 'msg': _friendly_err(str(e))}
+        if isinstance(prof, dict):
+            prof['channel'] = (load_token_info() or {}).get('channel') or 'phone'
+        self.profile = prof
+        return {'ok': True, 'profile': prof}
 
     def login_state(self):
         """登录页顶部要显示的「上次登录」信息（手机号只给掩码）。"""

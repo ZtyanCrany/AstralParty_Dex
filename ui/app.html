@@ -226,6 +226,17 @@
         flex:0 0 auto; vertical-align:-3.5px; border:1px solid #DDD3BF; border-radius:6px;
         color:#8C8270; cursor:pointer; }
   .qcp:hover{ border-color:#B4633A; color:#B4633A; background:#FBF6EE; }
+  /* 刷新按钮：跟在内容后面（不靠右），比复制按钮大一圈，白底，刷新中转圈 */
+  .qrf{ width:23px; height:22px; border-radius:7px; align-self:center; color:#7E7460;
+        background:#fff; }
+  .qrf svg{ width:15px; height:15px; }
+  .qrf.spin{ pointer-events:none; opacity:.6; }
+  .qrf.spin svg{ animation:qspin .9s linear infinite; transform-origin:50% 50%; }
+  @keyframes qspin{ to{ transform:rotate(360deg); } }
+  /* 「最近对局」标题行：刷新按钮紧跟在标题后面 */
+  #p-match h2{ display:flex; align-items:center; gap:9px; }
+  /* 19px 微软雅黑的行框中心比「最近对局」的墨迹中心高 2px，压低 2px 才跟标题同心 */
+  #p-match h2 .qrf{ position:relative; top:2px; }
   /* 复制成功的小提示：从锚点上方跳一下，然后慢慢淡掉 */
   .qtoast{ position:fixed; z-index:9999; pointer-events:none; font-size:12px; color:#fff;
            background:#B4633A; padding:3px 10px; border-radius:9px; white-space:nowrap;
@@ -620,7 +631,7 @@
     </div>
 
     <div class="pane" id="p-match">
-      <h2>最近对局</h2>
+      <h2>最近对局<i class="qcp qrf" id="mrf" title="刷新最近对局" onclick="refreshMatches()"></i></h2>
       <div class="box" id="matchBox"></div>
     </div>
 
@@ -1547,14 +1558,15 @@ function qDate(ts){
 // 16 位回放号超出 JS 安全整数范围，必须当字符串传给复盘弹窗（内部只当缓存键用）
 function qref(rid){ return "'" + String(rid) + "'"; }
 
-async function doQuery(){
-  const raw = ((document.getElementById('qin') || {}).value || '').trim();
+async function doQuery(refresh, text){
+  const raw = String(text || ((document.getElementById('qin') || {}).value || '')).trim();
   const box = document.getElementById('qbox');
   if(!raw){ qsay('请先输入回放号或 UID', true); return; }
+  window.__qtext = raw;                       // 刷新按钮复用这次查的内容
   qsay('');
   box.innerHTML = '<div class="mload">查询中…</div>';
   let r;
-  try{ r = await window.pywebview.api.query(raw); }
+  try{ r = await window.pywebview.api.query(raw, !!refresh); }
   catch(e){ box.innerHTML = '<div class="mload">✗ ' + qesc(e) + '</div>'; return; }
   if(!r || !r.ok){
     box.innerHTML = '<div class="mload">✗ ' + qesc((r && r.msg) || '查询失败') + '</div>';
@@ -1590,7 +1602,8 @@ async function doQuery(){
       <span class="quid" onclick="qCopy('${r.uid}', this)" title="复制 UID">UID <b>${r.uid}</b><i class="qcp" onclick="event.stopPropagation();qCopy('${r.uid}', this)">${QCP_ICON}</i></span>
       <span class="qsub">${r.level ? '等级 ' + r.level + ' · ' : ''}${r.online ? '在线' : '离线'}
       · 总场次 <b>${all}</b> · 胜场 <b>${win}</b>（${rate}%）
-      · 皮肤 <b>${st.skinCount || 0}</b> · 获赞 <b>${st.praiseNum || 0}</b></span></div>`;
+      · 皮肤 <b>${st.skinCount || 0}</b> · 获赞 <b>${st.praiseNum || 0}</b></span>
+      <i class="qcp qrf" id="qrf" title="刷新最近对局" onclick="refreshQuery()">${QRF_ICON}</i></div>`;
   const recs = r.records || [];
   window.__qrecs = recs;
   if(!recs.length){
@@ -1615,6 +1628,40 @@ const QCP_ICON = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="t
   + '<rect x="5.6" y="1.6" width="8.8" height="9.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<path d="M11.2 14.4H3.6a2 2 0 0 1-2-2V4.8" fill="none" stroke="currentColor" stroke-width="1.5"'
   + ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// 刷新按钮的图标（内联 SVG：循环箭头 + 箭头尖；界面里不允许用 emoji）
+const QRF_ICON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
+  + '<path d="M13.4 8A5.4 5.4 0 1 1 10.7 3.32" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.6" stroke-linecap="round"/>'
+  + '<path d="M11.6 1.9 12.98 4.62 10.1 4.9" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+{ const el = document.getElementById('mrf'); if(el) el.innerHTML = QRF_ICON; }
+
+// 刷新「最近对局」：最近对局只在登录握手包里，软件开着时不会自己更新，
+// 所以后端要重新登录一次（等价于重开软件，但不用真的重开）
+window.refreshMatches = async () => {
+  const btn = document.getElementById('mrf');
+  if(!btn || btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  btn.classList.add('spin');
+  let r = null;
+  try{ r = await window.pywebview.api.refresh_profile(); }
+  catch(e){ r = {ok:false, msg:String(e)}; }
+  if(btn){ btn.classList.remove('spin'); delete btn.dataset.busy; }
+  if(r && r.ok && r.profile){ try{ render(r.profile); }catch(e){} window.qToast('已刷新', btn); }
+  else { window.qToast((r && r.msg) || '刷新失败', btn); }
+};
+
+// 刷新「复盘查询」里的这个人：后端同样重新握手，再按同一条输入查一遍
+window.refreshQuery = async () => {
+  const btn = document.getElementById('qrf');
+  if(btn){ if(btn.dataset.busy) return; btn.dataset.busy = '1'; btn.classList.add('spin'); }
+  try{ await doQuery(true, window.__qtext); }
+  finally{
+    const b = document.getElementById('qrf');
+    if(b){ b.classList.remove('spin'); delete b.dataset.busy; }
+  }
+};
 
 // 复制成功的小提示：从锚点上方跳一下，然后慢慢淡掉
 window.qToast = (text, anchor) => {
