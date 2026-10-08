@@ -287,7 +287,14 @@
   .rvhead .rx{ margin-left:auto; cursor:pointer; color:#A79F91; font-size:15px;
                padding:2px 8px; border-radius:7px; }
   .rvhead .rx:hover{ background:#EDE7DA; color:var(--ink); }
-  .rvbody{ padding:14px 20px 20px; overflow-y:auto; }
+  .rvbody{ padding:0 20px 20px; overflow-y:auto; }
+  /* 顶部留白：内容区自身不留，改由第一个小节承担，
+     这样黏性行才能一直贴住内容区顶部（不会露出滑过去的卡牌）。
+     手牌视图的留白交给黏性行自己的内边距，保证「钉住」与「未钉住」上下一致 */
+  .rvbody>.rvsec:first-child{ margin-top:14px; }
+  .rvbody>.rvsec:first-child:has(.rvtit),
+  .rvbody>.rvsec:first-child:has(.htab){ margin-top:0; }
+  .rvbody>.rvsec:first-child:has(.htab)>h4:first-child{ padding-top:8px; }
   .rvsec{ margin-bottom:17px; }
   .rvsec>h4{ font-size:13px; color:#4E4739; font-weight:700; letter-spacing:0;
              margin:0 0 9px; padding-left:9px; border-left:3px solid #C6A15B; }
@@ -336,7 +343,11 @@
   .htab{ width:calc(100% - 12px); border-collapse:collapse; table-layout:fixed; }
   .htab th, .htab td{ border-bottom:1px solid #F1ECE2; vertical-align:top;
                       padding:7px 6px 7px 0; }
-  .htab thead th{ border-bottom:1px solid var(--line); padding-bottom:6px; }
+  /* 玩家页签（表头）：向下滚动时钉在弹窗顶部。
+     自带 8px 上内边距，钉住时不贴死、未钉住时不多占，两种状态观感一致。 */
+  .htab thead th{ border-bottom:1px solid var(--line);
+                  padding:8px 0 6px; position:sticky; top:0; z-index:3;
+                  background:#FCFAF6; box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   .htab th.hrt{ width:56px; font-size:11.5px; font-weight:600; color:#B0A995; text-align:left; }
   .htab tbody th.hrt{ color:#5E574A; }
   .hpl{ display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 4px;
@@ -359,7 +370,10 @@
   .hgrp:last-child{ margin-bottom:0; }
   .hlab{ display:block; font-size:10.5px; color:#B0A995; margin-bottom:3px;
          letter-spacing:.2px; white-space:nowrap; }
-  .rvtit{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  /* 逐轮明细的标题行（‹ 每轮手牌 + 头像 + 名字）：同样钉在顶部，留白规则同表头 */
+  .rvtit{ display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+          position:sticky; top:0; z-index:3; background:#FCFAF6;
+          padding:8px 0 7px; box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   .rvtit .hav{ width:22px; height:22px; border-radius:50%; object-fit:contain; }
   .hc.t-Counter{ background:#EDF5F1; border-color:#D8E9E1; color:#3F7A65; }
   .hc.t-curse{ background:#F6EDEC; border-color:#EAD8D5; color:#96574F; }
