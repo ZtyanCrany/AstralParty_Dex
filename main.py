@@ -2282,9 +2282,11 @@ def _selftest_helpers():
         def close(self):
             _FakeCli.closed += 1
 
-    global _auto, load_token_info
+    global _auto, load_token_info, load_region
     real_cli, real_auto = C.AstralClient, _auto
-    real_ti = load_token_info
+    real_ti, real_region = load_token_info, load_region
+    # 自检不依赖本机登过哪个服：海外服的票过期与否不该让自检变红
+    load_region = lambda: {'region': 'cn'}
     try:
         C.AstralClient = lambda *a, **k: _FakeCli()
         _auto = lambda: ('自检-sid', '')
@@ -2309,11 +2311,24 @@ def _selftest_helpers():
         if not (r or {}).get('ok') or st.get('skinCount') != 4 or st.get('fightCount') != 10:
             bad.append('「查自己」没走本地档案或字段对不上：%r'
                        % ((r or {}).get('msg') or st,))
+
+        # 海外服分支：票的来源与握手都用替身，只验证路由确实走了海外服那条
+        real_rs = intl_login.read_session
+        load_region = lambda: {'region': 'intl'}
+        intl_login.read_session = lambda: ('自检票', '自检设备号', '')
+        try:
+            api3 = Api()
+            api3._session()
+        except Exception as e:
+            bad.append('海外服分支建连接失败：%r' % (e,))
+        finally:
+            intl_login.read_session = real_rs
+            load_region = lambda: {'region': 'cn'}
     except Exception as e:
         bad.append('会话/自查自检异常：%r' % (e,))
     finally:
         C.AstralClient, _auto = real_cli, real_auto
-        load_token_info = real_ti
+        load_token_info, load_region = real_ti, real_region
     return bad
 
 

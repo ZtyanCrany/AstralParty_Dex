@@ -14,9 +14,9 @@
   首次全量约 1 分钟；此后每次启动几乎 0 秒；游戏更新后只扫新增的包。
 
 ════════ 资源位置 ════════
-    热更新缓存  %USERPROFILE%\\AppData\\LocalLow\\feimo\\AstralParty_CN\\
+    热更新缓存  %USERPROFILE%\\AppData\\LocalLow\\feimo\\AstralParty_{CN,INT}\\
                 com.unity.addressables\\AssetBundles\\<哈希>\\<哈希>\\__data
-    安装基础包  <Steam 库>\\steamapps\\common\\Astral Party\\<分支>\\AstralParty_CN_Data\\
+    安装基础包  <Steam 库>\\steamapps\\common\\Astral Party\\<分支>\\AstralParty_{CN,INT}_Data\\
                 StreamingAssets\\aa\\StandaloneWindows64\\*.bundle
 
 找不到游戏 / 提不出图 → 一律不报错、静默跳过，界面用占位头像兜底（见 ui/app.html 的 phAv）。
@@ -78,22 +78,41 @@ def _save_state(st: dict) -> None:
 
 # ══════════════════ 定位游戏 ══════════════════
 
-def find_cache():
-    """游戏热更新缓存目录（catalog_*.json 与 AssetBundles 所在处）。找不到返回 None。"""
-    cands = []
+def _region_pref() -> str:
+    """当前登录区服（'intl' / 'cn'）。只读 main 写下的那份记录，不反向 import。"""
+    try:
+        p = paths.DATA_DIR / 'last_region.json'
+        return (json.loads(p.read_text(encoding='utf-8')) or {}).get('region') or 'cn'
+    except Exception:
+        return 'cn'
+
+
+def find_cache(prefer: str = ''):
+    """游戏热更新缓存目录（catalog_*.json 与 AssetBundles 所在处）。找不到返回 None。
+
+    两个区服各有自己的缓存，内容并不相同（海外版包更多），所以优先取 prefer
+    指定的那个，默认取当前登录区服；指定的没有就退回另一个 —— 机器上只装了
+    其中一版时同样可用。
+    """
+    bases = []
     up = os.environ.get('USERPROFILE')
     if up:
-        cands.append(Path(up) / 'AppData/LocalLow/feimo/AstralParty_CN/com.unity.addressables')
+        bases.append(Path(up) / 'AppData/LocalLow')
     la = os.environ.get('LOCALAPPDATA')
     if la:
-        cands.append(Path(la).parent / 'LocalLow/feimo/AstralParty_CN/com.unity.addressables')
-    for c in cands:
-        try:
-            if (c / 'AssetBundles').is_dir() or next(c.glob('catalog_*.json'), None):
-                return c
-        except Exception:
-            continue
-    return None
+        bases.append(Path(la).parent / 'LocalLow')
+    got = {}
+    for who, name in (('cn', 'AstralParty_CN'), ('intl', 'AstralParty_INT')):
+        for b in bases:
+            c = b / 'feimo' / name / 'com.unity.addressables'
+            try:
+                if (c / 'AssetBundles').is_dir() or next(c.glob('catalog_*.json'), None):
+                    got[who] = c
+                    break
+            except Exception:
+                continue
+    want = prefer or _region_pref()
+    return got.get(want) or got.get('cn') or got.get('intl')
 
 
 # ══════════════════ 皮肤立绘变体（用于判定「有没有羁绊皮肤」）══════════════════
@@ -204,8 +223,8 @@ def find_installs(hint=None):
     两点注意：
       ① 同一目录会以不同大小写出现（注册表给 `d:\\St\\Steam`、libraryfolders 给 `D:\\St\\Steam`）
          → 不按大小写归一会把同一个库扫描两遍，耗时翻倍；
-      ② 机器上可能同时装着国服（AstralParty_CN）和国际服（AstralParty_INT）
-         → 本工具面向国服，优先只取 CN；没有 CN 才退回其它分支。
+      ② 机器上可能同时装着国服（AstralParty_CN）与国际服（AstralParty_INT）
+         → 优先取当前登录区服的那份，没有就退回另一份。
 
     兜底：`userdata/assets/_gamepath.txt` 第一行可手写 Steam 库根目录
     （如 `D:\\St\\Steam`）或**直接写资源包目录**（含 *.bundle 的那层），
@@ -234,8 +253,9 @@ def find_installs(hint=None):
                     all_dirs.append(aa)
         except Exception:
             continue
-    cn = [d for d in all_dirs if d.parents[2].name.endswith('_CN_Data')]
-    return cn or all_dirs
+    want = 'AstralParty_INT_Data' if _region_pref() == 'intl' else 'AstralParty_CN_Data'
+    mine = [d for d in all_dirs if d.parents[2].name.endswith(want)]
+    return mine or all_dirs
 
 
 def bundle_files(cache=None, installs=None):
