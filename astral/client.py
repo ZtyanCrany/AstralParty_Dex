@@ -183,6 +183,31 @@ class AstralClient:
         self.cipher_key = s2c.cipherKey
         return s2c
 
+    # ── 登录（CMDID 5001，国际服）──
+    def login_abroad(self, sid: str, device_id: str = '', client_ver: str = '3.2.0',
+                     source: int = 1):
+        """国际服握手：auth = Abroad(3) + abroad{source, sid, deviceId}。
+
+        sid    = 客户端 mmkv 里的票（fl_dft#user_steam 的 it，JWT）
+        source = 1（0/2/3 会被服务器判成票无效 err=10000）
+        国际服的 AbroadInfo 只有 3 个字段，比国服的 ChinaInfo 简单。
+        """
+        m = proto_loader.new_msg('protocol.ConnectC2S')
+        m.publicKey = proto_loader.PUBLIC_KEY
+        m.auth = proto_loader.AUTH_TYPE['Abroad']
+        m.clientVer = client_ver
+        m.abroad.source = source
+        m.abroad.sid = sid
+        m.abroad.deviceId = device_id
+        rsp = self.send(5001, m, wait=15.0)
+        s2c = proto_loader.new_msg('protocol.ConnectS2C')
+        s2c.ParseFromString(rsp['body'])
+        if rsp['err'] != 0:
+            raise ProtocolError('登录被拒，err=%d' % rsp['err'])
+        self.session_id = s2c.sessionId
+        self.cipher_key = s2c.cipherKey
+        return s2c
+
     # ── 数据查询 ──
     def heartbeat(self, value: int | None = None):
         """心跳（CMDID 5003，载荷 = tag 0x09 + fixed64 小端），游戏约每 5 秒发一次。

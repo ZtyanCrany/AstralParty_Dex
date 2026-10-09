@@ -34,6 +34,7 @@ from astral.sdk_login import (patch_token_meta, clear_token,  # noqa: E402
 from astral.sdk_login import (auto_login as _auto,   # noqa: E402
                               save_token, load_token, token_login)
 from astral import game_session                      # noqa: E402
+from astral import intl_login                        # noqa: E402
 
 GAME_HOST, GAME_PORT = '101.132.186.71', 8800
 
@@ -137,7 +138,8 @@ def _load_potential():
 # ═══════════════════════════════════════════════════════════════════════
 # 复盘数据：从【回放文件】解析
 #
-#   回放服务器：https://sereplaycn.feimogames.com/prod/<replayId>
+#   回放服务器：国服 sereplaycn / 国际服 sereplayjp
+#     （按登录区服在 REPLAY_HOSTS 里自动选；两种服的回放号互不相通）
 #     · 公开静态文件，无需凭据
 #     · 内容 = 压缩后的 protobuf 序列（开头 18 字节自定义头 + 一串 model.Room 快照）
 #     · 每帧 = 一个 model.Room，字段：2=房名 5=map_id 6=房主 9=players…
@@ -150,9 +152,52 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.2'  # 工具版本号
+VERSION = 'v1.2.3'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
-REPLAY_URL = 'https://sereplaycn.feimogames.com/prod/%s'
+# 回放服务器按区服分，两服的**回放号互不相通**（拿一边的号查另一边一律 404）。
+# 登录时按 profile.region 设一次 REPLAY_REGION，之后全程跟着走 ——
+# 不用让用户自己选，存档 / 复盘 / 导出都自动对上。
+REPLAY_HOSTS = {'cn': 'https://sereplaycn.feimogames.com/prod/%s',
+                'intl': 'https://sereplayjp.feimogames.com/prod/%s'}
+REPLAY_REGION = 'cn'
+
+
+def replay_url(rid):
+    """按当前登录的区服拼回放地址（没登录或国服时用国服的）。"""
+    return REPLAY_HOSTS.get(REPLAY_REGION, REPLAY_HOSTS['cn']) % rid
+
+
+def replay_key(rid):
+    """缓存键。回放号只在各自服务器内唯一，所以缓存不能只按号存 ——
+    万一两边的号撞上，会把另一边的回放/地图当成自己的。"""
+    return ('intl_%s' % rid) if REPLAY_REGION == 'intl' else str(rid)
+
+
+# 上次登录的是哪个区服（登录页显示与开机自动登录都看它）。
+# 只存显示用的元信息，**不存票**：海外服的票始终现读客户端 mmkv，
+# 国服的票在 token.json 里（由 sdk_login 管理，这边不碰）。
+_REGION_FILE = DATA_DIR / 'last_region.json'
+
+
+def save_region(region, profile=None, account=''):
+    d = profile or {}
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        _REGION_FILE.write_text(json.dumps({
+            'region': region, 'account': account or d.get('account') or '',
+            'nick': d.get('nick') or '', 'uid': d.get('uid') or '',
+            'saved_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
+        }, ensure_ascii=False), encoding='utf-8')
+    except Exception:
+        pass
+
+
+def load_region():
+    """上次登录的区服信息；没有记录就当作国服。"""
+    try:
+        return json.loads(_REGION_FILE.read_text(encoding='utf-8')) or {}
+    except Exception:
+        return {}
 
 # ── 列表用的「只抓开头」方案 ──
 # 地图 ID 在回放文件开头 300 字节内（字段5 = fixed32 小端），
@@ -216,11 +261,12 @@ def fetch_replay_map(replay_id):
     rid = str(replay_id or '')
     if not rid:
         return None
-    if rid in _map_cache and 'diff' in (_map_cache.get(rid) or {}):
-        return _map_cache[rid]              # 旧缓存没有 diff 字段 ⇒ 当未命中，重新抓
+    k = replay_key(rid)                     # 缓存键带区服：两种服的回放号互不相通
+    if k in _map_cache and 'diff' in (_map_cache.get(k) or {}):
+        return _map_cache[k]                # 旧缓存没有 diff 字段 ⇒ 当未命中，重新抓
     try:
         req = urllib.request.Request(
-            REPLAY_URL % rid, headers={'Range': 'bytes=0-%d' % (REPLAY_PREFIX - 1)})
+            replay_url(rid), headers={'Range': 'bytes=0-%d' % (REPLAY_PREFIX - 1)})
         with urllib.request.urlopen(req, timeout=15) as r:
             buf = r.read(REPLAY_PREFIX)
         mid = map_from_prefix(buf)
@@ -228,7 +274,7 @@ def fetch_replay_map(replay_id):
     except Exception:
         return None
     info = {'id': mid, 'name': map_name(mid) or '未知地图', 'diff': df}
-    _map_cache[rid] = info
+    _map_cache[k] = info
     return info
 
 # ConditionalInfo 字段号 → 展示名
@@ -340,12 +386,12 @@ def fetch_replay_stats(replay_id):
     if not replay_id:
         return {}
     REPLAY_DIR.mkdir(parents=True, exist_ok=True)
-    cache = REPLAY_DIR / ('%s.bin' % replay_id)
+    cache = REPLAY_DIR / ('%s.bin' % replay_key(replay_id))
     if cache.exists() and cache.stat().st_size > 2000:
         data = cache.read_bytes()
     else:
         op = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # 直连
-        req = urllib.request.Request(REPLAY_URL % replay_id,
+        req = urllib.request.Request(replay_url(replay_id),
                                      headers={'User-Agent': 'Mozilla/5.0'})
         data = op.open(req, timeout=90).read()
         cache.write_bytes(data)
@@ -551,11 +597,11 @@ REVIEW_DIR = DATA_DIR / 'review'
 def get_replay_file(replay_id):
     """确保本地有该局回放文件（复用既有缓存目录），返回 Path"""
     REPLAY_DIR.mkdir(parents=True, exist_ok=True)
-    cache = REPLAY_DIR / ('%s.bin' % replay_id)
+    cache = REPLAY_DIR / ('%s.bin' % replay_key(replay_id))
     if cache.exists() and cache.stat().st_size > 2000:
         return cache
     op = urllib.request.build_opener(urllib.request.ProxyHandler({}))      # 直连
-    req = urllib.request.Request(REPLAY_URL % replay_id, headers={'User-Agent': 'Mozilla/5.0'})
+    req = urllib.request.Request(replay_url(replay_id), headers={'User-Agent': 'Mozilla/5.0'})
     data = op.open(req, timeout=90).read()
     cache.write_bytes(data)
     return cache
@@ -1251,14 +1297,42 @@ class Api:
             return 'uid', s
         return '', s
 
+    def _region(self):
+        """当前登录区服：'intl' = Steam 海外服，其余（包括还没有记录）= 国服。
+
+        登录时写进 userdata/last_region.json（只记区服与显示用信息，不存票）。
+        """
+        return load_region().get('region') or 'cn'
+
+    def _bind_region(self, region):
+        """把回放服务器切到当前区服：两服的服务器不同，回放号也互不相通。
+
+        登录路径由 _fetch 调用；查询路径不发登录握手，需要自己调。
+        """
+        global REPLAY_REGION
+        REPLAY_REGION = region or 'cn'
+        return REPLAY_REGION
+
     def _session(self, force_new=False):
         """拿一条已登录的游戏连接（查 UID 用；回放号那条路不需要登录）。
 
         必须复用：服务器会把短时间内反复登录的请求静默丢弃（登录握手直接超时、
         一个包都收不到），每查一次就重新登录的话，连查两次就会全线超时。
+
+        区服必须跟着登录走：两服的 UID 是各自号段，票也只能打自己的服务器。
         """
         if not force_new and self._sess is not None:
             return self._sess
+        if self._region() == 'intl':
+            tok, did, why = intl_login.read_session()
+            if not tok:
+                raise RuntimeError(why or '海外服登录票不可用')
+            c = C.AstralClient(intl_login.GAME_HOST, intl_login.GAME_PORT,
+                               timeout=20.0)
+            c.connect()
+            c.login_abroad(tok, device_id=did, client_ver='3.2.0')
+            self._sess = c
+            return c
         sid, why = _auto()
         if not sid:
             raise RuntimeError(why or '登录态不可用，请先用验证码登录一次')
@@ -1299,12 +1373,20 @@ class Api:
         """
         prof = self.profile
         if refresh or not prof or str(prof.get('uid')) != str(uid):
-            sid, why = _auto()
-            if not sid:
-                return {'ok': False, 'kind': 'uid', 'uid': uid,
-                        'msg': why or '登录态不可用，请先用验证码登录一次'}
-            prof = self._fetch(sid)
-            self.profile = prof
+            if self._region() == 'intl':
+                # 海外服重新握手走 mmkv 那条路（票不落盘，现读现用）
+                r = self._auto_login_intl()
+                if not r.get('ok'):
+                    return {'ok': False, 'kind': 'uid', 'uid': uid,
+                            'msg': r.get('msg') or '海外服登录失败'}
+                prof = self.profile
+            else:
+                sid, why = _auto()
+                if not sid:
+                    return {'ok': False, 'kind': 'uid', 'uid': uid,
+                            'msg': why or '登录态不可用，请先用验证码登录一次'}
+                prof = self._fetch(sid)
+                self.profile = prof
         recs = []
         for r in list(prof.get('recent') or []):
             rid = str(r.get('replayId') or '')
@@ -1346,6 +1428,8 @@ class Api:
         kind, s = self._classify(text)
         if not kind:
             return {'ok': False, 'msg': '请输入回放号（16 位长数字）或 UID（6~7 位数字）'}
+        # 这条路径不发登录握手，区服要自己绑（登录路径由 _fetch 绑）。
+        self._bind_region(self._region())
 
         if kind == 'replay':
             rid = s
@@ -1383,7 +1467,13 @@ class Api:
         for attempt in (1, 2):
             try:
                 c = self._session(force_new=(attempt > 1))
-                sp = c.get_show_player(uid, timeout=15.0)
+                got = c.get_show_player(uid, timeout=15.0)
+                # 校验回包是这个 UID 的：连接复用时，上一次超时留下的残包会被
+                # 这次读走（表现为查到别人）。对不上就丢掉连接重试。
+                got_id = int(getattr(got.showData, 'player_id', 0) or 0)
+                if got_id and got_id != int(uid):
+                    raise RuntimeError('回包 uid=%s 与请求 %s 不符' % (got_id, uid))
+                sp = got
                 break
             except Exception as e:
                 last = str(e)
@@ -1393,6 +1483,12 @@ class Api:
         if sp is None:
             return {'ok': False, 'kind': 'uid', 'uid': uid,
                     'msg': _friendly_err(last)}
+        if not int(getattr(sp.showData, 'player_id', 0) or 0):
+            # 查不到时服务器回 player_id=0；两服的 UID 是各自号段，要说明白。
+            _rg = '海外服' if self._region() == 'intl' else '国服'
+            return {'ok': False, 'kind': 'uid', 'uid': uid,
+                    'msg': '这个 UID 在%s上查不到 —— 国服和海外服的 UID 是各自号段，'
+                           '两边的号不能混着查' % _rg}
         try:
             sd = sp.showData
             stt = sd.statistics
@@ -1446,9 +1542,33 @@ class Api:
             except Exception:
                 pass
 
+    def _auto_login_intl(self):
+        """海外服免码登录：票一直在客户端 mmkv 里，现读现用（不落盘）。"""
+        try:
+            tok, did, why = intl_login.read_session()
+        except Exception as e:
+            return {'ok': False, 'msg': '读取海外服登录票失败：%s' % str(e)[:80]}
+        if not tok:
+            return {'ok': False, 'msg': why or '海外服登录票不可用'}
+        try:
+            self._finish_login(tok, None, '', channel='intl', region='intl',
+                               device_id=did, account=intl_login.account_name())
+        except Exception as e:
+            return {'ok': False, 'msg': _friendly_err(str(e))}
+        nick = str((self.profile or {}).get('nick') or '').strip()
+        return {'ok': True, 'profile': self.profile,
+                'msg': '✓ 已用记住的登录态登录：%s（Steam 海外服 登录）'
+                       % (nick or '海外服')}
+
     # ── ② 登录 + 拉档案 ──
     def auto_login(self):
-        """用上次记住的 accessToken 自动登录（免验证码）。"""
+        """用上次记住的登录态自动登录（免验证码）。
+
+        上次登的是哪个区服记在 last_region.json 里：
+        国服走 SDK 的 accessToken，海外服现读客户端 mmkv 的票 —— 两边都能免码进。
+        """
+        if self._region() == 'intl':
+            return self._auto_login_intl()
         try:
             sid, why = _auto()
         except Exception as e:
@@ -1476,6 +1596,11 @@ class Api:
         最近对局只在登录握手包里（showPlayer.record[10]），软件一直开着时不会自己更新，
         所以打完一把要重开软件才看得到；这一步相当于把软件重开一次，但不用真的重开。
         """
+        if self._region() == 'intl':
+            r = self._auto_login_intl()
+            if r.get('ok'):
+                return {'ok': True, 'profile': self.profile}
+            return {'ok': False, 'msg': r.get('msg') or '海外服登录失败'}
         try:
             sid, why = _auto()
         except Exception as e:
@@ -1492,16 +1617,29 @@ class Api:
         return {'ok': True, 'profile': prof}
 
     def login_state(self):
-        """登录页顶部要显示的「上次登录」信息（手机号只给掩码）。"""
+        """登录页顶部要显示的「上次登录」信息（手机号只给掩码）。
+
+        国服看 token.json；海外服看 last_region.json —— 票在客户端 mmkv 里，
+        这边只报「票在不在」和上次的昵称，不碰票本身。
+        """
         info = load_token_info() or {}
         prof = self.profile or {}
+        lr = load_region()
+        reg = lr.get('region') or 'cn'
+        base = lr if reg == 'intl' else info
         return {
             'version': VERSION,
-            'has_token': bool(info.get('accessToken')),
-            'tel_masked': info.get('tel_masked') or '',
-            'uid': prof.get('uid') or info.get('uid') or '',
-            'nick': prof.get('nick') or info.get('nick') or '',
-            'saved_at': (info.get('saved_at') or '').replace('T', ' ')[:16],
+            'region': reg,
+            'region_label': '海外服' if reg == 'intl' else '国服',
+            # 海外服的票寿命很短，过期不等于没记住账号：只要记过就返回 true，
+            # 界面照常显示上次登录并试一次自动登录（票过期会把原因说清楚）。
+            'has_token': bool(lr.get('nick')) if reg == 'intl'
+                         else bool(info.get('accessToken')),
+            'tel_masked': '' if reg == 'intl' else (info.get('tel_masked') or ''),
+            'account': base.get('account') or '',
+            'uid': prof.get('uid') or base.get('uid') or '',
+            'nick': prof.get('nick') or base.get('nick') or '',
+            'saved_at': (base.get('saved_at') or '').replace('T', ' ')[:16],
         }
 
     def logout(self):
@@ -1529,6 +1667,10 @@ class Api:
             clear_token()
         except Exception:
             pass
+        try:
+            _REGION_FILE.unlink(missing_ok=True)   # 「上次登的是海外服」也一并忘掉
+        except Exception:
+            pass
         return {'ok': True, 'msg': '已清除本机登录态'}
 
     def _remember_id(self):
@@ -1546,27 +1688,37 @@ class Api:
         except Exception:
             return False
 
-    def _finish_login(self, sid, resp, tel='', channel='phone'):
+    def _finish_login(self, sid, resp, tel='', channel='phone', region='cn',
+                      device_id=None, account=''):
         """登录成功后的公共收尾：记住本机登录态 → 读档案。
 
-        channel：本机这次是用哪种方式登进来的（phone/steam/bilibili/taptap）。
-        界面上的渠道标签就用它 —— 服务器给的 platform 一律回 CN_STEAM，认不得。
+        channel：本机这次是用哪种方式登进来的
+                 （phone/steam/bilibili/taptap/intl）。界面上的渠道标签就用它 ——
+                 服务器给的 platform 一律回 CN_STEAM，认不得。
+
+        region='intl'（Steam 海外服）时**什么都不落盘**：票是客户端 mmkv 里的，
+        写进本工具的 token.json 会把国服的登录态顶掉，而且那张票也不该留在磁盘上。
         """
-        try:
-            saved = save_token(resp, tel)
-            self.token_saved = bool(saved)
-        except Exception:
-            self.token_saved = False
+        self.token_saved = False
         self.sid = sid
-        try:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            (DATA_DIR / 'sid.txt').write_text(sid, encoding='utf-8')
-        except Exception:
-            pass
-        self.profile = self._fetch(sid)
+        if region == 'cn':
+            try:
+                saved = save_token(resp, tel)
+                self.token_saved = bool(saved)
+            except Exception:
+                self.token_saved = False
+            try:
+                DATA_DIR.mkdir(parents=True, exist_ok=True)
+                (DATA_DIR / 'sid.txt').write_text(sid, encoding='utf-8')
+            except Exception:
+                pass
+        self.profile = self._fetch(sid, region=region, device_id=device_id)
         if isinstance(self.profile, dict):
             self.profile['channel'] = channel
-        self._remember_id()
+            self.profile['region'] = region
+        if region == 'cn':
+            self._remember_id()
+        save_region(region, self.profile, account=account)
 
     def do_login(self, phone: str, code: str):
         phone = re.sub(r'\D', '', phone or '')
@@ -1789,40 +1941,128 @@ class Api:
         """用 TapTap 客户端日志里的票登录。"""
         return self._chan_log_login('taptap', 'TapTap', 'CN_TAPTAP')
 
-    def _fetch(self, sid):
-        """登录握手 → 档案字典（登录成功后连接留着，给复盘查询复用）。"""
+    # ── Steam 海外服（国际服）登录 ──────────────────────────────
+    # 票由客户端自己存在 mmkv.default 的 fl_dft#user_steam.it，
+    # 直接拿它进国际服游戏服握手，不需要 SDK 换票。
+    def intl_state(self):
+        """登录页用：本机海外服客户端有没有可用的登录票（只读，很快）。
+
+        客户端 mmkv 里只记着一个账号号；以前登录过的话优先显示记下的角色昵称。
+        """
+        try:
+            st = intl_login.state()
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:80]}
+        try:
+            lr = load_region()
+            if st.get('ok') and (lr.get('region') or '') == 'intl' and lr.get('nick'):
+                st['account'] = st.get('user') or ''
+                st['user'] = lr['nick']
+        except Exception:
+            pass
+        return st
+
+    def intl_login(self):
+        """用海外服客户端里的票登录（免验证码、免 SDK 换票）。
+
+        只发一次握手：国际服服务器对连续握手敏感（会被限流），失败就失败，
+        不做自动重试；也不在启动时自动登录 —— 登进去会把海外服客户端挤下线。
+        """
+        try:
+            tok, did, why = intl_login.read_session()
+        except Exception as e:
+            return {'ok': False, 'msg': '读取海外服登录票失败：%s' % str(e)[:80]}
+        if not tok:
+            return {'ok': False, 'need_login': True, 'expired': True,
+                    'msg': why or '没读到海外服的登录票'}
+        try:
+            self._finish_login(tok, None, '', channel='intl', region='intl',
+                               device_id=did, account=intl_login.account_name())
+        except Exception as e:
+            return {'ok': False, 'expired': True, 'need_login': True,
+                    'msg': str(e)[:160] or '登录失败'}
+        nick = str((self.profile or {}).get('nick') or '').strip()
+        return {'ok': True, 'profile': self.profile, 'nick': nick,
+                'account': 'Steam 海外服 登录',
+                'msg': '✓ 已登录：%s（Steam 海外服 登录）' % (nick or '本机客户端')}
+
+    def _handshake_china(self, c, sid):
+        """国服握手（带「被挤下线」自动重试）。返回 (是否接管, ConnectS2C, 连接)。
+
+        ★ 账号已经在别处（游戏客户端 / 上一次会话）在线时，服务器会先把旧会话
+          踢掉、并回一个 err=10020 的"登录被拒"；隔一两秒重发就通了 ——
+          用户手动"再点一次登录"走的就是这条路。这里替他自动重试，
+          顺手把那句"被拒"翻译成人话（err=10020 太抽象了）。
+        """
+        for _try in range(3):
+            try:
+                s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
+                                    extra=DEFAULT_EXTRA, client_ver='3.2.0')
+                return _try > 0, s2c, c
+            except C.ProtocolError as e:
+                if '10020' not in str(e):
+                    raise
+                if _try >= 2:
+                    raise C.ProtocolError(
+                        'err=10020：这个账号正在别处在线（游戏客户端或上次的会话）。'
+                        '同一个账号只能在线一处 —— 把游戏客户端退掉，再点一次登录就好。')
+                time.sleep(1.2 + _try)
+                try:
+                    c.close()     # 被踢之后连接可能已经废了，重连再发
+                except Exception:
+                    pass
+                c = C.AstralClient(c.host, c.port, timeout=20.0)
+                c.connect()
+
+    def _fetch(self, sid, region='cn', device_id=None):
+        """登录握手 → 档案字典（登录成功后连接留着，给复盘查询复用）。
+
+        region='cn'   国服：SDK 换来的票 + China 段握手
+        region='intl' 国际服：客户端 mmkv 里的票 + Abroad 段握手
+        握手之后的档案结构两边一致，下面全部共用。
+        """
+        self._bind_region(region)   # 回放服务器跟着区服走（见 REPLAY_HOSTS）
         self._drop_session()        # 换新连接前先把旧的关掉
-        c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
+        host = intl_login.GAME_HOST if region == 'intl' else GAME_HOST
+        port = intl_login.GAME_PORT if region == 'intl' else GAME_PORT
+        c = C.AstralClient(host, port, timeout=20.0)
         c.connect()
         ok = False
         self._took_over = False       # 是否替用户接管了"被挤下线"的会话
-        try:
-            # ★ 账号已经在别处（游戏客户端 / 上一次会话）在线时，服务器会先把旧会话
-            #   踢掉、并回一个 err=10020 的"登录被拒"；隔一两秒重发就通了 ——
-            #   用户手动"再点一次登录"走的就是这条路。这里替他自动重试，
-            #   顺手把那句"被拒"翻译成人话（err=10020 太抽象了）。
-            s2c = None
-            for _try in range(3):
+        if region == 'intl':
+            # 国际服不做循环重试（反复握手会被服务器限流）。只有 err=10020
+            # 「账号正在别处在线」补一次：服务器会踢掉旧会话，隔两秒即可重连。
+            for _try in range(2):
                 try:
-                    s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
-                                        extra=DEFAULT_EXTRA, client_ver='3.2.0')
-                    self._took_over = _try > 0
+                    s2c = c.login_abroad(sid, device_id=device_id or '',
+                                         client_ver='3.2.0')
                     break
                 except C.ProtocolError as e:
-                    if '10020' not in str(e):
-                        raise
-                    if _try >= 2:
+                    msg = str(e)
+                    if '10000' in msg:
                         raise C.ProtocolError(
-                            'err=10020：这个账号正在别处在线（游戏客户端或上次的会话）。'
-                            '同一个账号只能在线一处 —— 把游戏客户端退掉，再点一次登录就好。')
-                    time.sleep(1.2 + _try)
-                    try:
-                        c.close()     # 被踢之后连接可能已经废了，重连再发
-                    except Exception:
-                        pass
-                    c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
-                    c.connect()
+                            'err=10000：这张票已经失效了。在海外服客户端里重新登录一次，'
+                            '回来再点这个按钮就好。')
+                    if '10020' in msg:
+                        if _try >= 1:
+                            raise C.ProtocolError(
+                                'err=10020：这个账号正在别处在线（海外服客户端或上一次的会话）。'
+                                '把海外服客户端退掉，过一会儿再点一次就好。')
+                        time.sleep(2.0)
+                        try:
+                            c.close()     # 被踢之后连接可能已经废了，重连再发
+                        except Exception:
+                            pass
+                        c = C.AstralClient(c.host, c.port, timeout=20.0)
+                        c.connect()
+                        continue
+                    raise
             p = s2c.player
+        else:
+            # 国服：China 段握手（内部会处理"被挤下线"的重试）
+            ok, s2c, c = self._handshake_china(c, sid)
+            p = s2c.player
+        try:
             # 结构（已对照离线握手包复核）：
             #   task.condition      = map<int,int>   → dict() 直接就是 {condType: 值}
             #   task.condition1[17] = map<int,ConditionData>
@@ -1848,6 +2088,7 @@ class Api:
             self._sess = c          # 留给复盘查询复用：短时间内再登一次会被服务器丢包
             ok = True
             return {'nick': getattr(p, 'nick', '?'), 'uid': getattr(p, 'id', '?'),
+                    'region': region,
                     'platform': (getattr(p, 'platform', '')
                                  or getattr(s2c, 'platform', '') or 'CN_STEAM'),
                     'server': getattr(p, 'serverId', '?'),
@@ -2033,6 +2274,9 @@ def _selftest_helpers():
             pass
 
         def login_china(self, *a, **k):
+            pass
+
+        def login_abroad(self, *a, **k):
             pass
 
         def close(self):

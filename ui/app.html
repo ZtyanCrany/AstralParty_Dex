@@ -120,6 +120,19 @@
      taptap.io 品牌资源页给的是 #28C290，偏绿，客户端没用它） */
   .chrow button.lgTap{ background:#00C4B2; border-color:#00C4B2; color:#fff; }
   .chrow button.lgTap:hover{ background:#00A697; border-color:#00A697; }
+  /* 海外服与国服是同一个 Steam 客户端，沿用 Steam 蓝，靠单独一行区分 */
+  .chrow2{ display:flex; margin-top:10px; }
+  .chrow2 button{ flex:0 1 130px; }        /* 与上面三个按钮同宽（(440-30-20)/3=130） */
+  .chrow2 button.lgIntl{ background:#2C5C8F; border-color:#2C5C8F; color:#fff; }
+  .chrow2 button.lgIntl:hover{ background:#244C79; border-color:#244C79; }
+  /* 区服标签：国服 / 海外服。盒模型逐项与 .chtag 一致，否则两个标签会一高一低。 */
+  .rgtag{ display:inline-block; margin-left:8px; padding:1px 8px 2px;
+          font-size:11px; line-height:16px; font-weight:600; color:#fff;
+          border-radius:9px; vertical-align:3px; letter-spacing:.3px;
+          white-space:nowrap; }
+  /* 国服与「飞魔通行证」标签同色（#B4633A）；海外服沿用 Steam 蓝 */
+  .rgtag.cn{ background:#B4633A; }
+  .rgtag.ins{ background:#2C5C8F; }
   /* 登录记录失效时的提示（按钮正下方） */
   .chmsg{ display:none; margin-top:9px; font-size:12px; color:#C0453A; }
   .chmsg.on{ display:block; }
@@ -576,6 +589,9 @@
           <button id="btnBili" class="lgBili" onclick="biliLogin()">Bilibili登录</button>
           <button id="btnTap" class="lgTap" onclick="taptapLogin()">TapTap登录</button>
         </div>
+        <div class="chrow2">
+          <button id="btnIntl" class="lgIntl" onclick="intlLogin()">Steam海外服登录</button>
+        </div>
         <div class="chmsg" id="chMsg"></div>
         <div class="chhint" id="chHint">正在检查本机的登录记录…</div>
       </div>
@@ -749,12 +765,13 @@ async function channelState(){
   if(ref) ref.className = 'chref spin';
   if(hint) hint.innerHTML = '正在检查本机的登录记录…';
   chSay(''); chRedNote1(false);
-  let s = null, b = null, t = null;
+  let s = null, b = null, t = null, g = null;
   try{
     const r = await Promise.all([window.pywebview.api.steam_state(),
                                  window.pywebview.api.bili_state(),
-                                 window.pywebview.api.taptap_state()]);
-    s = r[0]; b = r[1]; t = r[2];
+                                 window.pywebview.api.taptap_state(),
+                                 window.pywebview.api.intl_state()]);
+    s = r[0]; b = r[1]; t = r[2]; g = r[3];
   }catch(e){}
   // Steam：先用客户端登录记录；没有记录才去问内存（游戏正开着时能读到）
   let sName = (s && s.log && s.log.user) || '';
@@ -767,8 +784,10 @@ async function channelState(){
   }
   const bName = (b && b.ok && b.user) ? b.user : '';
   const tName = (t && t.ok && t.user) ? t.user : '';
-  CH = { s: sName, b: bName, t: tName };
-  if(dot) dot.className = 'chdot' + (sName || bName || tName ? ' on' : '');
+  // 海外服：票在客户端自己手里（mmkv），没有渠道昵称，显示 mmkv 里记的账号
+  const gName = (g && g.ok && g.user) ? g.user : '';
+  CH = { s: sName, b: bName, t: tName, i: gName };
+  if(dot) dot.className = 'chdot' + (sName || bName || tName || gName ? ' on' : '');
   if(ref) ref.className = 'chref';
   if(!hint) return;
   hint.innerHTML =
@@ -777,13 +796,18 @@ async function channelState(){
                       : '未检测到Bilibili游戏账号')
     + '<br>' + (tName ? '检测到TapTap游戏账号：<b>' + tName + '</b>'
                       : '未检测到TapTap游戏账号')
+    + '<br>' + (gName ? '检测到Steam海外服账号：<b>' + gName + '</b>'
+                      : (g && g.ok ? '检测到Steam海外服登录票'
+                                   : '未检测到Steam海外服账号'))
     + '<br><i' + (CHWarn ? ' class="warn"' : '') + '>1·若未检测到游戏账号，'
     + '则使用对应渠道登录一次游戏，再刷新本页面</i>'
     + '<br><i>2·本工具登录会将游戏挤下线，属正常现象，待进入主页后，可再登进游戏</i>';
 }
 // 点渠道按钮的前置检查：这个渠道到底有没有登录记录？没有就红第 1 条
 function chPre(ch){
-  const has = (ch === 'steam' ? CH.s : ch === 'bili' ? CH.b : CH.t);
+  const has = (ch === 'steam' ? CH.s
+             : ch === 'bili'  ? CH.b
+             : ch === 'intl'  ? CH.i : CH.t);
   chRedNote1(!has);
   chSay('');
   return has;
@@ -832,6 +856,22 @@ async function taptapLogin(){
   say('正在用本机的 TapTap 登录记录登录…','wait');
   let r;
   try{ r = await window.pywebview.api.taptap_login(); }
+  catch(e){ r = {ok:false, msg:'调用失败：' + e}; }
+  if(b) b.disabled = false;
+  if(!chDone(r)) return;
+  say(r.msg,'ok');
+  afterLogin(r.profile);
+}
+
+// ── Steam 海外服（国际服）：票在客户端自己的 mmkv.default 里，不经过渠道 SDK，
+//    直接拿它握手。档案结构与国服一致，档案页 / 复盘 / 导出全部复用，
+//    只是连接的服务器不同；海外服不做自动重试（服务器对连续握手敏感）。
+async function intlLogin(){
+  const b = $('#btnIntl'); if(b) b.disabled = true;
+  chPre('intl');
+  say('正在用本机的海外服登录记录登录…','wait');
+  let r;
+  try{ r = await window.pywebview.api.intl_login(); }
   catch(e){ r = {ok:false, msg:'调用失败：' + e}; }
   if(b) b.disabled = false;
   if(!chDone(r)) return;
@@ -918,8 +958,12 @@ async function boot(allowAuto){
   if(el && s){
     el.style.display = '';
     if(s.has_token){
-      el.innerHTML = '上次登录：<b>' + (s.uid ? 'UID ' + s.uid : '本机已记住登录态') + '</b>'
-        + (s.nick ? '　' + s.nick : '')
+      // 昵称优先；「国服 / 海外服」标在后面（同一账号两边是两套数据）
+      el.innerHTML = '上次登录：<b>'
+        + (s.nick || (s.uid ? 'UID ' + s.uid : '本机已记住登录态')) + '</b>'
+        + '<span class="rgtag ' + (s.region === 'intl' ? 'ins' : 'cn') + '">'
+        + (s.region_label || '国服') + '</span>'
+        + (s.nick && s.uid ? '　UID ' + s.uid : '')
         + (s.tel_masked ? '<br>手机号 <b>' + s.tel_masked + '</b>' : '')
         + (s.saved_at ? '　' + s.saved_at : '')
         + '<br><span class="forget" onclick="forgetAccount()">清除本机记住的登录态</span>';
@@ -1161,6 +1205,11 @@ function renderSkins(d){
   });
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
+function rgTag(region){                        // 区服标签：同一账号在两边是两套数据
+  const r = region || ((window.__profile || {}).region) || 'cn';
+  return '<span class="rgtag ' + (r === 'intl' ? 'ins' : 'cn') + '">'
+       + (r === 'intl' ? '海外服' : '国服') + '</span>';
+}
 function render(d){
   window.__profile = d;                       // 记住当前档案：补到头像新图后要重渲染（见 artPoll）
   try{ renderSkins(d); }catch(e){}
@@ -1168,11 +1217,13 @@ function render(d){
   const esc = window.__esc = window.__esc || (v => String(v == null ? '' : v)
       .replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])));
   const TAG = {phone:['飞魔通行证','t-phone'], steam:['Steam','t-steam'],
-               bilibili:['Bilibili','t-bilibili'], taptap:['TapTap','t-taptap']};
+               bilibili:['Bilibili','t-bilibili'], taptap:['TapTap','t-taptap'],
+               intl:['Steam','t-steam']};   // 只说渠道；国服/海外服由后面的 .rgtag 说
   const tg = TAG[String(d.channel || 'phone')] || [String(d.channel || ''), 't-phone'];
   $('#nick').innerHTML = esc(d.nick)
       + (d.level ? '<i class="nlv">Lv.' + esc(d.level) + '</i>' : '')
-      + '<span class="chtag ' + tg[1] + '">' + esc(tg[0]) + '</span>';
+      + '<span class="chtag ' + tg[1] + '">' + esc(tg[0]) + '</span>'
+      + rgTag(d.region);
   $('#subline').textContent = `UID ${d.uid}`;
   const cards = [
     ['累计参与', d.total, '局'],
@@ -1577,7 +1628,7 @@ async function doQuery(refresh, text){
     const rec = (r.records || [])[0] || {};
     box.innerHTML = `<div class="match open">
       <div class="mhead">
-        <div class="t">回放号 ${qesc(r.replay_id)}</div>
+        <div class="t">回放号 ${qesc(r.replay_id)}${rgTag()}</div>
         <div class="m got">${qesc(r.map_name || '未知地图')}${dChip(r.difficulty)}</div>
         <div class="res">对局</div>
         <div class="h"></div>
@@ -1596,7 +1647,7 @@ async function doQuery(refresh, text){
   const all = st.fightCount || 0, win = st.winFightCount || 0;
   const rate = all ? (100 * win / all).toFixed(1) : '—';
   qsay('已取到 ' + (r.nick || ('UID ' + r.uid)) + ' 的最近对局');
-  const head = `<div class="qme"><b>${qesc(r.nick || ('UID ' + r.uid))}</b>
+  const head = `<div class="qme"><b>${qesc(r.nick || ('UID ' + r.uid))}</b>${rgTag()}
       <span class="quid" onclick="qCopy('${r.uid}', this)" title="复制 UID">UID <b>${r.uid}</b><i class="qcp" onclick="event.stopPropagation();qCopy('${r.uid}', this)">${QCP_ICON}</i></span>
       <span class="qsub">${r.level ? '等级 ' + r.level + ' · ' : ''}${r.online ? '在线' : '离线'}
       · 总场次 <b>${all}</b> · 胜场 <b>${win}</b>（${rate}%）
