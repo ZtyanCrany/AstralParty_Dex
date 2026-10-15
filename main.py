@@ -78,14 +78,30 @@ def _load_tables():
 
 HERO, TITLE = _load_tables()
 MODE = {1: '标准对战', 2: '合作挑战', 3: '限时玩法', 4: '合作挑战'}
-MAPS = {81005: '龙宫游乐园（旧）', 81007: '梦想号-上层甲板', 82007: '星趴·梦想号', 82008: '御魂庆典',
-        82010: '水乡古镇', 82012: '魔法学院', 82013: '龙宫游乐园',
-        82014: '幽魂暗巷', 82015: '园林中庭', 82016: '异变图书馆',
-        83001: '海选赛运动场', 83002: '淘汰赛运动场', 83003: '决赛大赛场'}
+# 兜底的地图名；实际以 missions.json 为准（运行时数据层会把它换成客户端现抽的那份）
+MAPS_FALLBACK = {
+    81005: '龙宫游乐园（旧）', 81007: '梦想号-上层甲板', 82007: '星趴·梦想号',
+    82008: '御魂庆典', 82010: '水乡古镇', 82012: '魔法学院', 82013: '龙宫游乐园',
+    82014: '幽魂暗巷', 82015: '园林中庭', 82016: '异变图书馆',
+    83001: '海选赛运动场', 83002: '淘汰赛运动场', 83003: '决赛大赛场',
+}
 
 # 地图 ID 与 wiki 预览图编号之间不存在稳定对应关系（81005 这类老地图可由
 # 筹码表的地图限定字段 mapLimit 反查到编号，但并不服从「后三位」规律），
 # 因此只收录有官方数据来源的条目；查不到时按「地图8xxxx」如实显示。
+
+
+def _load_maps():
+    """地图 ID → 名字：兜底表 + missions.json（客户端的 STRMap 会补进后者）。"""
+    out = dict(MAPS_FALLBACK)
+    for k, v in _load_missions().items():
+        name = (v or {}).get('name') if isinstance(v, dict) else None
+        try:
+            if name:
+                out[int(k)] = name
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def map_name(mid):
@@ -111,6 +127,7 @@ def _load_missions():
 
 
 MISSIONS = _load_missions()
+MAPS = _load_maps()          # 读 missions.json，故排在 _load_missions 之后
 
 
 def mission_names(mid, mission_ids):
@@ -492,9 +509,10 @@ def _reload_static_tables():
     这些表在启动时读入内存，仅替换文件不生效；同时清掉回放与复盘的表缓存
     （它们首次使用时才加载）。
     """
-    global HERO, TITLE, MISSIONS, POTENT, POTENT_SRC, SKIN_WIKI_FILE, SKIN_LIVE_FILE
+    global HERO, TITLE, MISSIONS, MAPS, POTENT, POTENT_SRC, SKIN_WIKI_FILE, SKIN_LIVE_FILE
     HERO, TITLE = _load_tables()
     MISSIONS = _load_missions()
+    MAPS = _load_maps()
     POTENT, POTENT_SRC = _load_potential()
     SKIN_WIKI_FILE = data_file('skins.json')
     SKIN_LIVE_FILE = data_file('skins_live.json')
@@ -679,12 +697,10 @@ def build_skins(p):
         # 联动角色没有羁绊皮肤（不显示这一格）；且背包里没有 <角色>001 这条初始皮肤
         # 记录，但「拥有角色」本身就等于拥有其初始外观 ⇒ 已拥有时初始皮肤直接算已拥有。
         # 计数仍按背包（与游戏内显示一致），不为联动角色额外 +1。
-        # ── 这一行怎么排格子 ──
-        # 按序号顺序拼：001 初始 → 002 羁绊（联动没有立绘就不设这一格）→ 003+ 名皮
-        # → 【背包里有、名单里没有的序号一律补一格「皮肤 00X」】。
-        # 补格子这条是关键：以前只画"名单里有的"，背包里多出来的条目会被计入统计却看不见，
-        # 于是顶部统计与框里亮格数对不上。任何一条都不允许凭空消失。
-        # 联动角色没有羁绊皮肤 ⇒ 名皮紧贴初始皮肤排（002 起）；普通角色 002 是羁绊，名皮从 003 起
+        # ── 排格子规则 ──
+        # 按序号拼：001 初始 → 002 羁绊（联动无立绘则不设这一格）→ 003+ 名皮；
+        # 背包里有、名单里没有的序号也必须补一格「皮肤 00X」，否则顶部统计与亮格数对不上。
+        # 联动角色没有羁绊皮肤，名皮紧贴初始皮排（002 起）；普通角色 002 是羁绊，名皮从 003 起。
         _base = 2 if collab else 3
         slots = {1: '初始皮肤'}
         if not collab:
@@ -1433,7 +1449,7 @@ class Api:
         except Exception as e:
             return {'ok': False, 'msg': '复制失败：%s' % str(e)[:80]}
 
-    # ── ★ 复盘查询：一个输入框自动识别「回放号 / UID」──
+    # ── 复盘查询：一个输入框自动识别「回放号 / UID」──
     @staticmethod
     def _classify(text):
         """识别输入文本：('replay', 回放号) / ('uid', UID) / ('', 原样)。"""

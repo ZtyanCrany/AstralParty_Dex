@@ -215,6 +215,50 @@ def gen_monsters(tables, base=None):
     return out, rep
 
 
+# ── 地图 ────────────────────────────────────────────────────────
+MAP_MIN, MAP_MAX = 80000, 89999      # 回放前缀里的地图 ID 号段
+MAP_PLACEHOLDER = re.compile(r'^(?:Map_\d+|测试地图)$')
+
+
+def is_map_id(key):
+    """STRMap 里的键是不是地图 ID（5 位、8 开头）。"""
+    return MAP_MIN <= key <= MAP_MAX
+
+
+def gen_missions(tables, base=None):
+    """STRMap：`8xxxx` → 地图名，补进 `assets/data/missions.json`。
+
+    missions.json 除地图名外还带每张图的任务目标（normal/hard），那部分文案表里没有
+    （目标由 STRPVEMission 模板加怪物名拼成），只能沿用基线；本函数只补充客户端新增的
+    地图，既有条目原样保留、不改名。
+
+    排除占位名（`Map_001`、`测试地图`）、基线已有的 ID、以及名字已被占用的 ID ——
+    地图改版后旧 ID 仍留在表里，加进来会出现同名两行。
+
+    返回 (合并后的表, 报告)。
+    """
+    smap = _int_keys(tables.get('STRMap'))
+    out = dict(base or {})
+    used = {str(v.get('name')) for v in out.values() if isinstance(v, dict)}
+    skipped, added = [], {}
+    for k in sorted(smap):
+        if not is_map_id(k):
+            continue
+        name = clean(smap[k]).strip()
+        if not name or MAP_PLACEHOLDER.match(name):
+            continue
+        if str(k) in out or name in used:
+            skipped.append(str(k))
+            continue
+        added[str(k)] = {'name': name, 'normal': [], 'hard': [], 'title': name}
+        used.add(name)
+    out.update(added)
+    out = {k: out[k] for k in sorted(out, key=lambda x: (len(x), x))}
+    rep = {'keys': len(smap), 'maps': sum(1 for k in smap if is_map_id(k)),
+           'added': added, 'skipped': skipped, 'total': len(out)}
+    return out, rep
+
+
 # ── 角色 ────────────────────────────────────────────────────────
 def char_tables(tables, wiki=None):
     """角色 ID → {name, title}。

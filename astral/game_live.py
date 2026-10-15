@@ -20,7 +20,8 @@ from pathlib import Path
 from . import paths, tablegen
 
 # 生成小表所需的表
-NEEDED = ('STRCard', 'STRItem', 'STRCharacter', 'STRRelic', 'STRBuff', 'STRMonster')
+NEEDED = ('STRCard', 'STRItem', 'STRCharacter', 'STRRelic', 'STRBuff', 'STRMonster',
+          'STRMap')
 
 # 定位配置包的标记：卡牌美术资源名前缀
 MARKER = b'UT_HandCard_'
@@ -448,6 +449,8 @@ def refresh(bundled_dir=None, force=False, log=None):
         ('chips.json', lambda: tablegen.gen_chips(tables, load_base('chips.json', []))[0]),
         ('buffs.json', lambda: tablegen.gen_buffs(tables)[0]),
         ('monsters.json', lambda: tablegen.gen_monsters(tables)[0]),
+        ('missions.json', lambda: tablegen.gen_missions(tables,
+                                                       load_base('missions.json', {}))[0]),
         ('heroes.json', lambda: tablegen.gen_heroes(tables, load_base('heroes.json', []), wiki)[0]),
         ('character_ids.json', lambda: _gen_char_ids(tables, wiki,
                                                     load_base('character_ids.json', []))),

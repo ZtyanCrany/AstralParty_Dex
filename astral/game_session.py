@@ -44,8 +44,8 @@ STEAM_APP_ID = '2622000'
 _TOKEN_RE = re.compile(rb'"[Aa]ccess_?[Tt]oken"\s*:\s*"([A-Za-z0-9_\-\.]{16,400})"')
 
 # 票前后邻域里能捡到的会话字段。
-# ★ 键一律写成【带引号的字面量】并显式列出各拼写 —— 用 [Cc]h_?[Uu]id 这类字符类
-#   简写在 bytes 模式下匹配不上，字面量最稳。
+# 键一律写成带引号的字面量并显式列出各拼写：字符类简写（[Cc]h_?[Uu]id）在 bytes
+# 模式下匹配不上，字面量最稳。
 _SESSION_FIELDS = (
     (rb'"plat"', 'plat'),
     (rb'"LoginType"', 'login_type'), (rb'"login_type"', 'login_type'),
@@ -316,7 +316,7 @@ def account_label(sess):
 #   B站渠道     LocalLow/feimo/吉星派对/BnSdk/110001957/Log/*.log
 # ⇒ 只要用该渠道登录过一次，就够工具用很久：既不必提权读内存（B站客户端以管理员
 #   运行，OpenProcess 会 err=5），也不必让游戏保持在线。
-# ★ 只读本机文件；令牌一律掩码，不外传、不落盘。
+# 只读本机文件；令牌一律掩码，不外传、不落盘。
 _LOG_DIRS = {
     'steam': ('AppData/LocalLow/feimo/AstralParty_CN/BnSdk/110001933/Log',
               'AppData/LocalLow/feimo/AstralParty_INT/BnSdk/110001933/Log'),
