@@ -610,5 +610,41 @@
   "desc": "指定一个友方角色，使目标获得1张【罪证嫌疑】\n回合结束时，如果在手牌中，消耗本卡牌，使自身获得1层【罪证】",
   "mode": "PVE",
   "from": "地图卡牌:异变图书馆"
+ },
+ {
+  "id": 21026,
+  "name": "疾行菇",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21027,
+  "name": "仙品杨桃",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21028,
+  "name": "芳香蜜桃",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "",
+  "mode": "PVE",
+  "from": "基础卡牌"
+ },
+ {
+  "id": 21029,
+  "name": "招财树",
+  "type": "Effect",
+  "target": "Entity",
+  "desc": "",
+  "mode": "PVE",
+  "from": "基础卡牌"
  }
 ]

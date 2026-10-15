@@ -225,7 +225,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "生命值低于50%时，攻击力+3，且无法被反击。",
+  "desc": "当前生命值不超过生命值上限的50%时，攻击力+3，且无法被反击。",
   "style": "",
   "map_limit": []
  },
@@ -235,7 +235,7 @@
   "quality": "金",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "生命值低于50%时，攻击力+8，且无法被反击。",
+  "desc": "当前生命值不超过生命值上限的50%时，攻击力+8，且无法被反击。",
   "style": "",
   "map_limit": []
  },
@@ -871,7 +871,7 @@
   "quality": "蓝",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "效果牌伤害+1。",
+  "desc": "效果牌伤害+2。",
   "style": "",
   "map_limit": []
  },
@@ -881,7 +881,7 @@
   "quality": "紫",
   "tag": "Attack",
   "tag_full": "Attack",
-  "desc": "生命值低于50%时，攻击力+4，受到伤害-1。",
+  "desc": "当前生命值不超过生命值上限的50%时，攻击力+4，受到伤害-1。",
   "style": "",
   "map_limit": []
  },
@@ -931,7 +931,7 @@
   "quality": "紫",
   "tag": "Card",
   "tag_full": "Card",
-  "desc": "",
+  "desc": "使用技能后，对自身3格范围内的所有怪物造成2点伤害，每击中1个怪物，使自身攻击力+2，持续1轮，并获得1层。",
   "style": "",
   "map_limit": []
  },
@@ -941,7 +941,7 @@
   "quality": "蓝",
   "tag": "Generic",
   "tag_full": "Generic",
-  "desc": "停留在怪物突击门或疾行时，获得2，并使得下次移动速度+2。",
+  "desc": "停留在怪物突击门或疾行时，获得3，并使得下次移动速度+2。",
   "style": "",
   "map_limit": []
  },

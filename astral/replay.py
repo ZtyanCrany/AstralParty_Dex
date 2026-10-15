@@ -340,14 +340,23 @@ def parse_replay(src, replay_id=None):
 _CHIPS = None
 
 
+def reload_tables():
+    """丢弃缓存的表（客户端内容更新后由 main.py 调用）。
+
+    表在首次使用时加载并缓存，不清掉会一直沿用旧数据。
+    """
+    global _CHIPS, _BUFFS, _MONSTERS
+    _CHIPS = _BUFFS = _MONSTERS = None
+
+
 def chip_table():
     """{ID: {'name','quality','desc','tag'}}（assets/data/chips.json）"""
     global _CHIPS
     if _CHIPS is None:
         import json
-        from astral.paths import asset
+        from astral.paths import data_file
         try:
-            raw = json.loads(Path(asset('assets', 'data', 'chips.json')).read_text(encoding='utf-8'))
+            raw = json.loads(Path(data_file('chips.json')).read_text(encoding='utf-8'))
             _CHIPS = {int(c['id']): c for c in raw}
         except Exception:
             _CHIPS = {}
@@ -362,9 +371,9 @@ def buff_table():
     global _BUFFS
     if _BUFFS is None:
         import json
-        from astral.paths import asset
+        from astral.paths import data_file
         try:
-            raw = json.loads(Path(asset('assets', 'data', 'buffs.json')).read_text(encoding='utf-8'))
+            raw = json.loads(Path(data_file('buffs.json')).read_text(encoding='utf-8'))
             _BUFFS = {int(k): v for k, v in raw.items()}
         except Exception:
             _BUFFS = {}
@@ -403,9 +412,9 @@ def monster_table():
     global _MONSTERS
     if _MONSTERS is None:
         import json
-        from astral.paths import asset
+        from astral.paths import data_file
         try:
-            raw = json.loads(Path(asset('assets', 'data', 'monsters.json')).read_text(encoding='utf-8'))
+            raw = json.loads(Path(data_file('monsters.json')).read_text(encoding='utf-8'))
             _MONSTERS = {int(k): v for k, v in raw.items()}
         except Exception:
             _MONSTERS = {}

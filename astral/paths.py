@@ -41,3 +41,15 @@ def asset(*parts) -> Path:
     if p.exists():
         return p
     return BUNDLE_DIR.joinpath(*parts)
+
+
+def data_file(name) -> Path:
+    """数据表路径：优先 `userdata/game_live/` 里运行时生成的那份，其次内置表。
+
+    内置表是打包时的客户端快照，游戏更新后即过期；运行时表由
+    `astral/game_live.py` 启动时按本机客户端生成。
+    """
+    live = DATA_DIR / 'game_live' / name
+    if live.is_file():
+        return live
+    return asset('assets', 'data', name)

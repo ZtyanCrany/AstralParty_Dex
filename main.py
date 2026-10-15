@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from astral import paths                      # noqa: E402
-from astral.paths import asset, DATA_DIR      # noqa: E402
+from astral.paths import asset, data_file, DATA_DIR      # noqa: E402
 ROOT = paths.EXE_DIR                          # 打包后 = exe 所在目录（可写）
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -35,17 +35,38 @@ from astral.sdk_login import (auto_login as _auto,   # noqa: E402
                               save_token, load_token, token_login)
 from astral import game_session                      # noqa: E402
 from astral import intl_login                        # noqa: E402
+from astral import client_ver                        # noqa: E402
+
+
+def _probe_ver_login(host, port, region):
+    """客户端版本被服务器拒（err=10012）时，自动试探正确版本并重登。
+
+    游戏大版本更新后 clientVer 会变；这里每次换新票、逐个候选版本试握手，
+    命中后写入 userdata/client_ver.json，后续登录直接用缓存。
+    返回 (client, 版本, ConnectS2C)；失败返回 (None, None, None)。
+    """
+    def make_session():
+        if region == 'intl':
+            tok, did, _why = intl_login.read_session()
+            return tok or '', did or ''
+        sid, _why = _auto()
+        return sid or '', DEFAULT_DEVICE_ID
+
+    kind = 'abroad' if region == 'intl' else 'cn'
+    return client_ver.probe(host, port, make_session,
+                            base=client_ver.resolve(kind), kind=kind,
+                            extra=DEFAULT_EXTRA)
 
 GAME_HOST, GAME_PORT = '101.132.186.71', 8800
 
 # ── 静态表 ──────────────────────────────────────────────
 def _load_tables():
     hero, title = {}, {}
-    f = asset('assets', 'data', 'character_ids.json')
+    f = data_file('character_ids.json')
     if f.exists():
         for h in json.loads(f.read_text(encoding='utf-8')):
             hero[h['id']] = h['name']
-    f2 = asset('assets', 'data', 'heroes.json')
+    f2 = data_file('heroes.json')
     if f2.exists():
         for h in json.loads(f2.read_text(encoding='utf-8')):
             try:
@@ -79,13 +100,17 @@ def map_name(mid):
 
 
 # ── 地图任务名（来自 Wiki「地图任务」段，顺序与任务ID顺序一致，可经 target_num 交叉验证）──
-MISSIONS = {}
-try:
-    _mf = asset('assets', 'data', 'missions.json')
-    if _mf.exists():
-        MISSIONS = json.loads(_mf.read_text(encoding='utf-8'))
-except Exception:
-    MISSIONS = {}
+def _load_missions():
+    try:
+        _mf = data_file('missions.json')
+        if _mf.exists():
+            return json.loads(_mf.read_text(encoding='utf-8'))
+    except Exception:
+        pass
+    return {}
+
+
+MISSIONS = _load_missions()
 
 
 def mission_names(mid, mission_ids):
@@ -103,8 +128,8 @@ def mission_names(mid, mission_ids):
 # 服务器为每个物品分配一个**固定槽位**，未拥有的槽位为空洞。
 #   空洞数 = 缺少的皮肤套数；缺的是 Wiki 皮肤名顺序里【最前面】那几套
 #   （游戏把未拥有的排在列表最后，例如「清凉盛夏」排最后）
-POT_WIKI_FILE = asset('assets', 'data', 'potential.json')   # 来自 Wiki 抓取，可能滞后
-POT_LIVE_FILE = asset('assets', 'data', 'potential_live.json')   # 来自游戏内存的客户端配置表
+POT_WIKI_FILE = data_file('potential.json')   # 来自 Wiki 抓取，可能滞后
+POT_LIVE_FILE = data_file('potential_live.json')   # 来自游戏内存的客户端配置表
 
 
 def _load_potential():
@@ -455,12 +480,90 @@ def fetch_replay_stats(replay_id):
     return merged
 
 POTENT, POTENT_SRC = _load_potential()
-SKIN_WIKI_FILE = asset('assets', 'data', 'skins.json')
+SKIN_WIKI_FILE = data_file('skins.json')
+# 客户端文本表生成的皮肤清单（tools/sync_skins_from_game.py 产出），优先于 Wiki：
+# Wiki 会滞后于游戏更新，新皮肤只能显示占位名；客户端表随客户端版本一起更新。
+SKIN_LIVE_FILE = data_file('skins_live.json')
+
+
+def _reload_static_tables():
+    """客户端内容更新后重载静态表（角色 / 称号 / 地图任务 / 潜能 / 皮肤路径）。
+
+    这些表在启动时读入内存，仅替换文件不生效；同时清掉回放与复盘的表缓存
+    （它们首次使用时才加载）。
+    """
+    global HERO, TITLE, MISSIONS, POTENT, POTENT_SRC, SKIN_WIKI_FILE, SKIN_LIVE_FILE
+    HERO, TITLE = _load_tables()
+    MISSIONS = _load_missions()
+    POTENT, POTENT_SRC = _load_potential()
+    SKIN_WIKI_FILE = data_file('skins.json')
+    SKIN_LIVE_FILE = data_file('skins_live.json')
+    try:
+        from astral import replay, review
+        replay.reload_tables()
+        review.reload_tables()
+    except Exception:
+        pass
+
+
+# ── 客户端数据同步 ────────────────────────────────────────────
+# 内置数据表是打包时的客户端快照，游戏更新后即过期。启动时在后台比对客户端
+# 内容指纹，变化则重抽一次、写入 userdata/game_live/ 并重载内存中的表，
+# 使旧版本软件也能显示新版本内容。只读游戏文件，失败静默回退到内置表。
+DATA_SYNC = {'running': False, 'done': False, 'version': '', 'why': ''}
+DATA_SYNC_LOCK = threading.Lock()
+_WINDOW = None
+
+
+def data_sync_start():
+    """后台比对客户端内容，变化则重抽一次并让界面重载。"""
+    with DATA_SYNC_LOCK:
+        if DATA_SYNC['running']:
+            return
+        DATA_SYNC['running'] = True
+
+    def work():
+        from astral.log import log as _log
+        try:
+            from astral import game_live
+            if not game_live.is_stale():
+                DATA_SYNC['why'] = '客户端内容与手上的数据一致，不重抽'
+                return
+            rep = game_live.refresh(log=_log)
+            if not rep:
+                DATA_SYNC['why'] = '没抽到内容（详见日志）'
+                return
+            _log('客户端版本 %s：已重建 %s' % (rep['version'], ','.join(rep['wrote'])))
+            _reload_static_tables()
+            DATA_SYNC['version'] = rep['version']
+            DATA_SYNC['why'] = '已同步客户端 %s 的内容' % rep['version']
+            win = _WINDOW
+            if win is not None:      # 页面已加载旧表，重新载入取新数据
+                try:
+                    win.evaluate_js('location.reload()')
+                except Exception:
+                    pass
+        except Exception as e:
+            DATA_SYNC['why'] = '同步失败：%r' % (e,)
+        finally:
+            DATA_SYNC['running'] = False
+            DATA_SYNC['done'] = True
+
+    threading.Thread(target=work, name='client-data-sync', daemon=True).start()
 
 
 def _load_skin_wiki():
     try:
         return json.loads(SKIN_WIKI_FILE.read_text(encoding='utf-8'))
+    except Exception:
+        return {}
+
+
+def _load_skin_live():
+    """客户端皮肤清单；读不到就返回空（回退 Wiki，行为与旧版一致）。"""
+    try:
+        d = json.loads(SKIN_LIVE_FILE.read_text(encoding='utf-8'))
+        return d if isinstance(d, dict) else {}
     except Exception:
         return {}
 # 皮肤 ID 编码 = 100 + <角色ID 3位> + <序号 3位>（9 位）
@@ -516,17 +619,43 @@ def build_skins(p):
     """皮肤清单：直接从背包的 100<角色ID><序号> 空间读取，不做推断。
 
     契约状态取自 roleCard.isBreakThrough（游戏里的「缔结契约」按钮）。
+
+    皮肤名优先用客户端文本表生成的那份（`skins_live.json`，见
+    tools/sync_skins_from_game.py）—— Wiki 会滞后于游戏更新，新皮肤只能显示
+    「皮肤 006」这种占位名；客户端表随版本更新，且带角色称号。Wiki 仅作兜底。
     """
     wiki = _load_skin_wiki()
+    live = _load_skin_live()
+    live_chars = {}
+    for k, v in (live.get('chars') or {}).items():
+        try:
+            live_chars[int(k)] = v
+        except (TypeError, ValueError):
+            continue
+    # 号段不按「100<角色ID><序号>」直读的条目（联动共用号段）⇒ 客户端给的归属表
+    live_slots = {}
+    for k, v in (live.get('item_slots') or {}).items():
+        try:
+            live_slots[int(k)] = (int(v[0]), int(v[1]))
+        except (TypeError, ValueError, IndexError):
+            continue
+
     by_id = {}
     for nm, v in wiki.items():
         if v.get('id'):
             by_id[int(v['id'])] = (nm, v)
+    # 客户端收录的角色也纳入清单：新角色还没进 Wiki 时也能显示正确名字
+    for hid, v in live_chars.items():
+        by_id.setdefault(hid, (v.get('name') or ('角色#%d' % hid), {'title': v.get('title') or ''}))
 
     # ① 背包里 100 + 3位角色ID + 3位序号
     owned = {}
     for it in getattr(p, 'bag_items', []) or []:
         iid = int(getattr(it, 'item_id', 0))
+        if iid in live_slots:               # 客户端给的归属表最权威
+            cid, slot = live_slots[iid]
+            owned.setdefault(cid, set()).add(slot)
+            continue
         if iid in COLLAB_SKIN_SLOTS:        # 联动批次号段 ⇒ 按登记表还原到真正的角色
             cid, slot = COLLAB_SKIN_SLOTS[iid]
             owned.setdefault(cid, set()).add(slot)
@@ -544,6 +673,7 @@ def build_skins(p):
         has = owned.get(hid, set())
         nm, v = by_id.get(hid, ('角色#%d' % hid, {}))
         names = v.get('skins') or []
+        live_sl = (live_chars.get(hid) or {}).get('slots') or {}
         contract = bool(getattr(card, 'isBreakThrough', False))
         collab = (hid in COLLAB_IDS) or (hid in _bondless())   # 名单打底 + 本机立绘证据
         # 联动角色没有羁绊皮肤（不显示这一格）；且背包里没有 <角色>001 这条初始皮肤
@@ -559,8 +689,17 @@ def build_skins(p):
         slots = {1: '初始皮肤'}
         if not collab:
             slots[2] = '羁绊皮肤'
-        for i, sname in enumerate(names):
-            slots[_base + i] = sname
+        if live_sl:          # 客户端表：槽号直接对应皮肤 ID 的序号位，不用猜顺序
+            for _s, _nm2 in live_sl.items():
+                try:
+                    _si = int(_s)
+                except (TypeError, ValueError):
+                    continue
+                if _si >= _base:
+                    slots[_si] = _nm2
+        else:                # Wiki 兜底：按名单顺序接在初始/羁绊之后
+            for i, sname in enumerate(names):
+                slots[_base + i] = sname
         rows = []
         for _seq in sorted(set(slots) | set(has)):
             if _seq in slots:
@@ -581,10 +720,20 @@ def build_skins(p):
                     'have': have, 'total': len(rows), 'skins': rows})
     # 已拥有的排前面（按拥有数降序），未拥有的按角色 ID 排在后面
     out.sort(key=lambda x: (0 if x['owns'] else 1, -x['have'], x['id']))
-    # 游戏内「全部皮肤」= 每角色(初始+羁绊) + Wiki 命名皮肤；联动角色没有羁绊那一格
+    # 游戏内「全部皮肤」= 每角色(初始+羁绊) + 命名皮肤；联动角色没有羁绊那一格
     _bl = COLLAB_IDS | _bondless()          # 分母同样用「名单 + 本机立绘证据」
-    sk_total = sum((1 if int(v.get('id') or 0) in _bl else 2) + len(v.get('skins') or [])
-                   for v in wiki.values())
+    if live_chars:                          # 有客户端表就按它算，含 Wiki 还没收录的新皮肤
+        sk_total = 0
+        for _hid in set(by_id) | set(live_chars):
+            _lv = (live_chars.get(_hid) or {}).get('slots')
+            if _lv:
+                sk_total += len(_lv)
+            else:
+                _v = by_id.get(_hid, (None, {}))[1]
+                sk_total += (1 if int(_v.get('id') or 0) in _bl else 2) + len(_v.get('skins') or [])
+    else:
+        sk_total = sum((1 if int(v.get('id') or 0) in _bl else 2) + len(v.get('skins') or [])
+                       for v in wiki.values())
     return {'list': out, 'orig': tot_orig, 'bond': tot_bond, 'buy': tot_buy,
             'contract': n_ctr, 'named': tot_bond + tot_buy,
             'hero_have': sum(1 for x in out if x['owns']), 'hero_total': len(out),
@@ -1330,7 +1479,7 @@ class Api:
             c = C.AstralClient(intl_login.GAME_HOST, intl_login.GAME_PORT,
                                timeout=20.0)
             c.connect()
-            c.login_abroad(tok, device_id=did, client_ver='3.2.0')
+            c.login_abroad(tok, device_id=did)
             self._sess = c
             return c
         sid, why = _auto()
@@ -1338,8 +1487,23 @@ class Api:
             raise RuntimeError(why or '登录态不可用，请先用验证码登录一次')
         c = C.AstralClient(GAME_HOST, GAME_PORT, timeout=20.0)
         c.connect()
-        c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
-                      extra=DEFAULT_EXTRA, client_ver='3.2.0')
+        try:
+            c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
+                          extra=DEFAULT_EXTRA)
+        except C.ProtocolError as e:
+            if '10012' not in str(e):
+                raise
+            # 客户端版本过期：试出正确版本再重登
+            c2, _ver, _s2c = _probe_ver_login(GAME_HOST, GAME_PORT, 'cn')
+            if c2 is None:
+                raise C.ProtocolError(
+                    'err=10012：客户端版本不匹配（游戏刚更新过）。自动探测没成功 —— '
+                    '先打开一次游戏启动器（它会记下最新版本），再点登录。')
+            try:
+                c.close()
+            except Exception:
+                pass
+            c = c2
         self._sess = c
         return c
 
@@ -1997,9 +2161,21 @@ class Api:
         for _try in range(3):
             try:
                 s2c = c.login_china(sid, device_id=DEFAULT_DEVICE_ID,
-                                    extra=DEFAULT_EXTRA, client_ver='3.2.0')
+                                    extra=DEFAULT_EXTRA)
                 return _try > 0, s2c, c
             except C.ProtocolError as e:
+                if '10012' in str(e):
+                    # 客户端版本过期（游戏更新后 clientVer 变了）：试出正确版本再重登
+                    c2, _ver, s2c2 = _probe_ver_login(c.host, c.port, 'cn')
+                    if c2 is None:
+                        raise C.ProtocolError(
+                            'err=10012：客户端版本不匹配（游戏刚更新过）。自动探测没成功 —— '
+                            '先打开一次游戏启动器（它会记下最新版本），再点登录。')
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
+                    return True, s2c2, c2
                 if '10020' not in str(e):
                     raise
                 if _try >= 2:
@@ -2034,8 +2210,7 @@ class Api:
             # 「账号正在别处在线」补一次：服务器会踢掉旧会话，隔两秒即可重连。
             for _try in range(2):
                 try:
-                    s2c = c.login_abroad(sid, device_id=device_id or '',
-                                         client_ver='3.2.0')
+                    s2c = c.login_abroad(sid, device_id=device_id or '')
                     break
                 except C.ProtocolError as e:
                     msg = str(e)
@@ -2343,15 +2518,33 @@ def main():
         except Exception as e:
             print('selftest 自身失败:', e)
         return
+    if '--sync-data' in sys.argv:
+        # 手动同步客户端数据（排查用，无需开界面）
+        from astral import game_live
+        rep = game_live.refresh(force=True, log=lambda m: print(m, end=''))
+        print('✓ 已同步：%s' % rep if rep else '· 没抽到内容（游戏没装 / 找不到内容包）')
+        return
+    if '--reset-data' in sys.argv:
+        # 丢掉运行时的客户端数据，回到内置表
+        from astral import game_live
+        print('✓ 已清掉运行时数据' if game_live.clear() else '✗ 清理失败（文件被占用？）')
+        return
     api = Api()
+    global _WINDOW
     ww, wh = _fit_window()
-    webview.create_window('星趴档案', str(asset('ui', 'app.html')),
-                          js_api=api, width=ww, height=wh,
-                          min_size=(980, 620), background_color='#F0EEE6')
-    # 头像扫描交给 webview.start 的回调执行：必须等 GUI 后端（pythonnet → .NET 程序集）
-    # 加载完成后再起扫描线程。放在 start() 之前会与 .NET 加载抢同一批原生 DLL，
-    # 偶发程序集解析失败并直接崩在启动阶段（表现为「Unhandled exception in script」）。
-    webview.start(art_scan_start)
+    _WINDOW = webview.create_window('星趴档案', str(asset('ui', 'app.html')),
+                                    js_api=api, width=ww, height=wh,
+                                    min_size=(980, 620), background_color='#F0EEE6')
+
+    # 头像扫描 / 客户端数据同步都交给 webview.start 的回调执行：必须等 GUI 后端
+    # （pythonnet → .NET 程序集）加载完成后再起线程。放在 start() 之前会与 .NET
+    # 加载抢同一批原生 DLL，偶发程序集解析失败并直接崩在启动阶段
+    # （表现为「Unhandled exception in script」）。
+    def startup_tasks():
+        art_scan_start()
+        data_sync_start()
+
+    webview.start(startup_tasks)
 
 
 if __name__ == '__main__':

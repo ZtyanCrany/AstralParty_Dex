@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import frame, proto_loader
 from .log import debug
+from .sign import GAME_VERSION, GAME_VERSION_ABROAD
 
 # ── 服务端地址（国服）──
 WEB_HOST = 'se-web-cn.feimogames.com'
@@ -159,11 +160,15 @@ class AstralClient:
 
     # ── 登录（CMDID 5001）──
     def login_china(self, sid: str, device_id: str = '', extra: str = '',
-                    client_ver: str = '3.2.0', game_id: str | None = None,
+                    client_ver: str | None = None, game_id: str | None = None,
                     channel_id: str | None = None, app_id: str | None = None):
-        """client_ver 必须为 '3.2.0'（其它取值会被服务器判为客户端版本错误）
+        """client_ver 省略时按 client_ver.resolve('cn') 取（探测缓存 → 本机线索 → 内置默认），
+        服务器不认时返回 ClientVerErr(10012)。
         game_id/channel_id/app_id 可覆盖（排查 AuthErr 用；proto3 中传 '' 等于不传该字段）
         """
+        if client_ver is None:
+            from . import client_ver as _cv
+            client_ver = _cv.resolve('cn')
         m = proto_loader.new_msg('protocol.ConnectC2S')
         m.publicKey = proto_loader.PUBLIC_KEY
         m.auth = proto_loader.AUTH_TYPE['China']
@@ -184,14 +189,19 @@ class AstralClient:
         return s2c
 
     # ── 登录（CMDID 5001，国际服）──
-    def login_abroad(self, sid: str, device_id: str = '', client_ver: str = '3.2.0',
+    def login_abroad(self, sid: str, device_id: str = '', client_ver: str | None = None,
                      source: int = 1):
         """国际服握手：auth = Abroad(3) + abroad{source, sid, deviceId}。
+
+        client_ver 省略时按 client_ver.resolve('abroad') 取（与国服分开维护）。
 
         sid    = 客户端 mmkv 里的票（fl_dft#user_steam 的 it，JWT）
         source = 1（0/2/3 会被服务器判成票无效 err=10000）
         国际服的 AbroadInfo 只有 3 个字段，比国服的 ChinaInfo 简单。
         """
+        if client_ver is None:
+            from . import client_ver as _cv
+            client_ver = _cv.resolve('abroad')
         m = proto_loader.new_msg('protocol.ConnectC2S')
         m.publicKey = proto_loader.PUBLIC_KEY
         m.auth = proto_loader.AUTH_TYPE['Abroad']

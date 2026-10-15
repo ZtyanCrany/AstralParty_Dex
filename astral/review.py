@@ -356,14 +356,20 @@ def _msg(full_name):
     return _MSGS[full_name]
 
 
+def reload_tables():
+    """丢弃缓存的表（客户端内容更新后由 main.py 调用）。"""
+    global _CARDS
+    _CARDS = None
+
+
 def card_table():
     """{ID: {'name','type','desc','target','mode','from'}}（assets/data/cards.json）"""
     global _CARDS
     if _CARDS is None:
         import json
-        from astral.paths import asset
+        from astral.paths import data_file
         try:
-            raw = json.loads(Path(asset('assets', 'data', 'cards.json')).read_text(encoding='utf-8'))
+            raw = json.loads(Path(data_file('cards.json')).read_text(encoding='utf-8'))
             _CARDS = {int(c['id']): c for c in raw}
         except Exception:
             _CARDS = {}
