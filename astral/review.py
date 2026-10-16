@@ -211,6 +211,60 @@ def _round_at(rp, uid, frame):
     return None
 
 
+def _match_offer(offers, cid, f):
+    """该筹码出自哪次三选一/商店（±2 帧内、且候选里出现过）—— 取最近的那次"""
+    best, bd = None, None
+    for o in offers:
+        if abs(o['frame'] - f) > 2:
+            continue
+        if not any(cid in g['cands'] for g in o['chain']):
+            continue
+        d = abs(o['frame'] - f)
+        if bd is None or d < bd:
+            best, bd = o, d
+    return best
+
+
+def _chain_slices(offers, chips):
+    """{筹码ID: (起始组, 结束组)} —— 同一次 offer 里有多枚筹码时把链切开
+
+    同帧、同 (lv, supLv) 且中间没有 5249 的多次三选一会连成一条链（各次三选一的候选组
+    按包序连续排在一起）；不加区分时每枚筹码都会背上整条链，同一串候选在界面上画两遍。
+
+    切开规则：第 n 枚筹码的链 =「上一枚所属组的下一组」至「本枚所属组」，最后一枚取到
+    链尾。组号非递增、或某枚的候选不在链里（循环往复额外发的筹码不是选出来的）就不切，
+    按原样显示。
+    """
+    by_offer = {}
+    for cid, f in chips.items():
+        o = _match_offer(offers, cid, f)
+        if o is not None:
+            by_offer.setdefault(o['ord'], []).append((f, cid, o))
+    out = {}
+    for items in by_offer.values():
+        if len(items) < 2:
+            continue
+        rows = []
+        for f, cid, o in items:
+            hit = [i for i, g in enumerate(o['chain']) if cid in g['cands']]
+            if not hit:
+                rows = None
+                break
+            rows.append((hit[-1], f, cid, o))
+        if not rows:
+            continue
+        rows.sort()                 # 链按包序排列 ⇒ 所属组号小的那枚先被选中
+        idxs = [r[0] for r in rows]
+        if any(idxs[i] >= idxs[i + 1] for i in range(len(idxs) - 1)):
+            continue                # 组号非递增 ⇒ 分不清，按原样显示
+        start = 0
+        for k, (gidx, _f, cid, o) in enumerate(rows):
+            end = gidx if k < len(rows) - 1 else len(o['chain']) - 1
+            out[cid] = (start, end)
+            start = gidx + 1
+    return out
+
+
 def _player_chip_events(rp, uid, chips, all_groups):
     groups = all_groups.get(uid, {})
     stores = _shop_purchases(rp, uid, chips, groups)
@@ -220,6 +274,7 @@ def _player_chip_events(rp, uid, chips, all_groups):
     has_cycle = CYCLE_CHIP in chips
     cycle_frame = chips.get(CYCLE_CHIP)
     offers = _offer_events(rp, uid)
+    slices = _chain_slices(offers, chips)
     claimed = {}                      # 已被哪个事件认领（判断循环往复）
     used = {}                         # 已被哪次升级/哪个任务认领（判断循环往复）
     shop_price = 10                   # 第 n 次商店购买的预期价：10,15,20,25…
@@ -227,37 +282,30 @@ def _player_chip_events(rp, uid, chips, all_groups):
     events = []
 
     def _ev_ord(cid, f):
-        """该筹码所属事件的时间序号（用于让分配/展示顺序都跟事件走）"""
-        best, bd = 9999, None
-        for o in offers:
-            if abs(o['frame'] - f) > 2:
-                continue
-            if not any(cid in g['cands'] for g in o['chain']):
-                continue
-            d = abs(o['frame'] - f)
-            if bd is None or d < bd:
-                best, bd = o['ord'], d
-        return best
+        """该筹码所属事件的时间序号 + 组号（用于让分配/展示顺序都跟事件走）
+
+        组号 = 该筹码在自己那次 offer 的链里属于第几组，即玩家选它的先后；
+        同帧、同一次 offer 的多个筹码靠它定序。
+        """
+        o = _match_offer(offers, cid, f)
+        if o is None:
+            return (9999, 9999)
+        hit = [i for i, g in enumerate(o['chain']) if cid in g['cands']]
+        return (o['ord'], hit[-1] if hit else 9999)
 
     _order = {cid: _ev_ord(cid, f) for cid, f in chips.items()}
     for cid, f in sorted(chips.items(), key=lambda kv: (kv[1], _order[kv[0]])):
         # ① 出自哪个「事件」（记录帧通常 = 到手帧 或 前后一帧）
         #    轮次一律取【事件所在轮】：轮末的三选一/商店，筹码背包登记会晚一帧
         #    甚至跨到下一轮，若用登记帧的轮次会出现「第7轮下面挂着第6轮的筹码」
-        ev, dist = None, None
-        for o in offers:
-            if abs(o['frame'] - f) > 2:
-                continue
-            if not any(cid in g['cands'] for g in o['chain']):
-                continue
-            d = abs(o['frame'] - f)
-            if dist is None or d < dist:
-                ev, dist = o, d
+        ev = _match_offer(offers, cid, f)
         rnd = _round_at(rp, uid, ev['frame'] if ev is not None else f)
-        # ② 刷新链 = 该事件自己的候选组；选中的筹码只标在最后那一组（避免刷新前的同名也标为选中）
+        # ② 刷新链 = 该事件自己的候选组（同一次 offer 里多枚筹码时按 _chain_slices 切开）；
+        #    选中的筹码只标在最后那一组（避免刷新前的同名也标为选中）
         chain = []
         if ev is not None:
-            for g in ev['chain']:
+            lo, hi = slices.get(cid, (0, len(ev['chain']) - 1))
+            for g in ev['chain'][lo:hi + 1]:
                 chain.append({'cands': g['cands'],
                               'names': [chip_name(c) for c in g['cands']],
                               'picked': -1})
