@@ -2530,7 +2530,67 @@ def _selftest_helpers():
 
 
 
+def _clear_zone_marks():
+    """清掉「从网上下载」留下的来源标记（Mark-of-the-Web）。
+
+    Windows 会给下载来的文件写一个 Zone.Identifier 数据流；.NET 的 Assembly.LoadFrom
+    见到它就拒绝加载（0x80131515），于是 pythonnet 解析不到 Python.Runtime.Loader.Initialize，
+    程序启动直接失败（issue #2：Failed to resolve Python.Runtime.Loader.Initialize）。
+
+    这一步必须在 GUI 后端（pythonnet → .NET 程序集）加载之前做，用户就不必自己「解除锁定」。
+    只处理打包后的 _internal：源码运行时依赖在 site-packages，不归这里管。
+    """
+    base = getattr(sys, '_MEIPASS', None)
+    if not base:
+        return 0
+    import ctypes
+    import os
+    k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    k32.DeleteFileW.argtypes = [ctypes.c_wchar_p]
+    k32.DeleteFileW.restype = ctypes.c_int
+    n = 0
+    for dirpath, _dirs, files in os.walk(base):
+        for fn in files:
+            if k32.DeleteFileW(os.path.join(dirpath, fn) + ':Zone.Identifier'):
+                n += 1
+    return n
+
+
+def _startup_failed(err):
+    """GUI 后端起不来时给一句人话（打包后没有控制台，只能靠这个对话框）。"""
+    import ctypes
+    msg = ('星趴档案启动失败：%s\n\n'
+           '最常见的原因是解压出来的文件带着「从网络下载」的标记，'
+           'Windows 不允许 .NET 加载这类文件。\n'
+           '可以这样处理后重试：\n'
+           '  1) 右键解压出来的文件夹 → 属性 → 勾选「解除锁定」→ 确定；\n'
+           '  2) 或在 PowerShell 里执行：Get-ChildItem -Recurse | Unblock-File\n'
+           '  3) 或删掉解压目录重新解压（用较新的解压工具）。' % err)
+    try:
+        u32 = ctypes.windll.user32
+        u32.MessageBoxW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p,
+                                    ctypes.c_wchar_p, ctypes.c_uint]
+        u32.MessageBoxW.restype = ctypes.c_int
+        u32.MessageBoxW(None, msg, '星趴档案', 0x10)
+    except Exception:
+        pass
+
+
 def main():
+    # ★ 必须在任何 .NET 程序集加载之前清掉下载来源标记，否则 pythonnet 起不来
+    #   （issue #2：Failed to resolve Python.Runtime.Loader.Initialize）
+    try:
+        _n = _clear_zone_marks()
+        if _n:
+            from astral.log import log
+            log('已清除 %d 个文件的下载来源标记（Mark-of-the-Web）' % _n)
+    except Exception as _e:
+        try:
+            from astral.log import log
+            log('清理下载来源标记失败（不影响启动）：%r' % (_e,))
+        except Exception:
+            pass
+
     if '--selftest' in sys.argv:
         # 打包后排查用（--windowed 没有控制台）：写 userdata/log.txt 后直接退出
         try:
@@ -2566,7 +2626,18 @@ def main():
         art_scan_start()
         data_sync_start()
 
-    webview.start(startup_tasks)
+    try:
+        webview.start(startup_tasks)
+    except Exception as e:
+        # 打包后没有控制台：写进日志，并弹一句人话，而不是 PyInstaller 的
+        # "Unhandled exception in script"
+        try:
+            from astral.log import log
+            log('启动失败：%r' % (e,))
+        except Exception:
+            pass
+        _startup_failed(e)
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
