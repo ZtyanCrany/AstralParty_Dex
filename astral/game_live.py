@@ -239,22 +239,24 @@ def find_cfg_bundles(root, cache=True, caps=SCAN_CAPS):
     return hits
 
 
-def load_game_tables(root, log=None):
+def load_game_tables(root, log=None, raw_names=()):
     """找配置包 → 抽文案表，保证关键表齐全（不齐则放大扫描上限重来）。
 
-    返回 (包列表, 表)。
+    返回 (包列表, 表, 原始字节表)；`raw_names` 里的资产进第三项。
     """
+    raws = {}
     bundles = find_cfg_bundles(root)
-    tables = load_tables(bundles)
+    tables = load_tables(bundles, raw_names=raw_names, raws=raws)
     miss = [t for t in NEEDED if not tables.get(t)]
     if miss:
         _log('关键表缺 %s，放大扫描上限重来' % ','.join(miss), log)
         more = find_cfg_bundles(root, cache=False, caps=(SCAN_CAPS[-1],))
         if len(more) > len(bundles):
-            t2 = load_tables(more, only=None)
+            raws2 = dict(raws)
+            t2 = load_tables(more, only=None, raw_names=raw_names, raws=raws2)
             if len(t2) >= len(tables):
-                return more, t2
-    return bundles, tables
+                return more, t2, raws2
+    return bundles, tables, raws
 
 
 def _varint(buf, i):
@@ -315,8 +317,12 @@ def parse_records(buf):
     return out
 
 
-def load_tables(bundles, only=None):
-    """用 UnityPy 只读载入包，把 TextAsset 解析成 {表名: {键: 文本}}。"""
+def load_tables(bundles, only=None, raw_names=(), raws=None):
+    """用 UnityPy 只读载入包，把 TextAsset 解析成 {表名: {键: 文本}}。
+
+    `raw_names` 里的资产额外把原始字节收进 `raws`：`Map` / `Character` 这类配置表的值
+    是二进制，`parse_records` 解不出来，交给 `tablegen` 里的 wire 解码。
+    """
     try:
         import UnityPy
     except ImportError:
@@ -336,6 +342,8 @@ def load_tables(bundles, only=None):
                 continue
             raw = getattr(d, 'm_Script', b'')
             buf = raw.encode('utf-8', 'surrogateescape') if isinstance(raw, str) else raw
+            if raws is not None and name in raw_names and name not in raws:
+                raws[name] = buf
             rec = parse_records(buf)
             if rec:
                 tables.setdefault(name, {}).update(rec)
@@ -408,7 +416,7 @@ def refresh(bundled_dir=None, force=False, log=None):
         return None
     root = Path(cur['root'])
     t0 = time.time()
-    bundles, tables = load_game_tables(root, log=log)
+    bundles, tables, raws = load_game_tables(root, log=log, raw_names=('Character',))
     if not bundles:
         _log('没找到配置包：%s' % root, log)
         return None
@@ -454,6 +462,8 @@ def refresh(bundled_dir=None, force=False, log=None):
         ('heroes.json', lambda: tablegen.gen_heroes(tables, load_base('heroes.json', []), wiki)[0]),
         ('character_ids.json', lambda: _gen_char_ids(tables, wiki,
                                                     load_base('character_ids.json', []))),
+        ('potential_live.json', lambda: tablegen.gen_potential(
+            raws.get('Character'), tables, load_base('potential.json', {}), wiki)[0]),
         ('skins_live.json', lambda: dict(
             tablegen.gen_skins(tables, wiki)[0],
             source={'tables': ['STRItem', 'STRCharacter'],

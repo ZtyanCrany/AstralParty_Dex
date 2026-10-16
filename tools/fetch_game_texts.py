@@ -80,7 +80,7 @@ def main():
         bundles = game_live.find_cfg_bundles(root)
         tables = game_live.load_tables(bundles, only=args.table) if bundles else {}
     else:
-        bundles, tables = game_live.load_game_tables(root, log=lambda m: print(m, end=''))
+        bundles, tables, _ = game_live.load_game_tables(root, log=lambda m: print(m, end=''))
     if not bundles:
         print('✗ 没找到配置包（游戏未下载过配置？）')
         return 2

@@ -422,3 +422,100 @@ def gen_heroes(tables, base=None, wiki=None):
     rep = {'chars': len(out), 'with_title': sum(1 for h in out if h.get('title')),
            'with_skins': sum(1 for h in out if h.get('skins'))}
     return out, rep
+
+
+# ── 潜能 ──────────────────────────────
+POTENTIAL_FIELD = 22        # 角色配置里「潜能」那一项
+
+
+def _varint(buf, i):
+    v, sh = 0, 0
+    while i < len(buf):
+        c = buf[i]
+        i += 1
+        v |= (c & 0x7F) << sh
+        if not (c & 0x80):
+            return v, i
+        sh += 7
+        if sh > 28:
+            return None, i
+    return None, i
+
+
+def _pb_fields(buf):
+    """protobuf wire 解码 → [(字段号, wire类型, 值)]；0/5 为整数，2 为 bytes。"""
+    out, i, n = [], 0, len(buf)
+    while i < n:
+        tag, i = _varint(buf, i)
+        if tag is None or tag == 0:
+            break
+        f, wt = tag >> 3, tag & 7
+        if wt == 0:
+            v, i = _varint(buf, i)
+            if v is None:
+                break
+            out.append((f, 0, v))
+        elif wt == 1:
+            out.append((f, 1, int.from_bytes(buf[i:i + 8], 'little')))
+            i += 8
+        elif wt == 2:
+            ln, j = _varint(buf, i)
+            if ln is None or j + ln > n:
+                break
+            out.append((f, 2, buf[j:j + ln]))
+            i = j + ln
+        elif wt == 5:
+            out.append((f, 5, int.from_bytes(buf[i:i + 4], 'little')))
+            i += 4
+        else:
+            break
+    return out
+
+
+def _pb_records(buf):
+    """记录框架同 parse_records，值不做文本解析 → {键: 键之后的记录体}。
+
+    `Map` / `PVEMission` / `Character` 这类配置资产的值是二进制，parse_records 解不出来。
+    """
+    out, i, n = {}, 0, len(buf)
+    while i < n - 4:
+        if buf[i] != 0x0A:
+            i += 1
+            continue
+        ln, j = _varint(buf, i + 1)
+        if ln is None or ln < 5 or j + ln > n:
+            i += 1
+            continue
+        body = buf[j:j + ln]
+        if body[:1] == b'\x0d':
+            out[int.from_bytes(body[1:5], 'little')] = body[5:]
+        i = j + ln
+    return out
+
+
+def gen_potential(char_bytes, tables, base=None, wiki=None):
+    """角色「潜能是否已开放」小表：{角色名: {'released': bool, ...}}。
+
+    判据来自客户端 `Character` 资产：已开放潜能的角色比未开放的多一个 22 号字段
+    （潜能配置）。该判据与 Wiki 抓来的角色逐一对上，只差 Wiki 滞后的角色
+    （星魅琉华 119 在 3.3.0 开放）。输出沿用 potential.json 的形状（键 = 角色名），
+    Wiki 带的其它字段原样保留。
+    """
+    out = {k: (dict(v) if isinstance(v, dict) else {'released': bool(v)})
+           for k, v in (base or {}).items()}
+    if not char_bytes:
+        return out, {'chars': 0, 'changes': ['缺 Character 资产，潜能沿用 Wiki 数据']}
+    chars = char_tables(tables, wiki)
+    notes, hit = [], 0
+    for cid, rec in sorted(_pb_records(char_bytes).items()):
+        name = (chars.get(cid) or {}).get('name')
+        if not name:
+            continue
+        opened = any(f == POTENTIAL_FIELD and wt == 2 for f, wt, _ in _pb_fields(rec))
+        row = out.setdefault(name, {})
+        if row.get('released') != opened:
+            notes.append('%s %s→%s' % (name, row.get('released'), opened))
+        row['released'] = opened
+        row['source'] = 'client'
+        hit += 1
+    return out, {'chars': hit, 'changes': notes}

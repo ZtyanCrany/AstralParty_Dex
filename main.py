@@ -159,9 +159,9 @@ def _load_potential():
     """角色「潜能是否已开放」清单。
 
     来源优先级（游戏会持续开放新角色的潜能，Wiki 数据存在滞后）：
-      ① potential_live.json  —— 从游戏进程内存读取的客户端配置表，优先使用，
-                                游戏运行时自动同步，见 sync_potential_from_game
-      ② potential.json  —— Wiki 抓取，兜底（滞后于游戏更新）
+      ① potential_live.json  —— 运行时数据层从客户端角色配置（`Character` 资产的潜能在位）
+                                生成，游戏更新后自动同步，判据见 astral/tablegen.gen_potential
+      ② potential.json  —— 内置基线（Wiki 抓取 + 客户端核对过），打包时的快照
     返回 ({角色名: True/False}, 来源说明)
     """
     for f, tag in ((POT_LIVE_FILE, '游戏'), (POT_WIKI_FILE, 'Wiki')):
