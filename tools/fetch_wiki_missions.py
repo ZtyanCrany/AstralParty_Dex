@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
-"""抓 Wiki 各张地图的「地图任务」列表 → assets/data/missions.json"""
+"""抓 Wiki 各张地图的「地图任务」列表，合并进 assets/data/missions.json。
+
+默认只报告差异，`--apply` 才写文件（与 tools/sync_*.py 一致）。
+
+两点注意：
+1. Wiki 整份覆盖会丢数据——客户端同步补进来的地图（81003/81004/81006/81007/81009/
+   81011/82017 等）Wiki 里没有对应页面，所以这里只更新抓到的地图，其余原样保留。
+2. 新地图的 Wiki 页面可能是从别的地图复制来的（页面挂 {{施工中}}、预览图是别的编号、
+   任务段与另一张图逐字相同）——这种数据先用客户端核对再采用（见 skill
+   astral-party-reverse-engineering 的 references/map-mission-names.md）。
+"""
 import json
 import re
 import ssl
@@ -8,7 +18,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-sys.path.insert(0, r'D:\Xun_crany\星趴档案')
+HERE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(HERE))
+from astral.paths import asset                                    # noqa: E402
+
 BASE = 'https://wiki.biligame.com/starengine/'
 HDR = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
        'Referer': 'https://wiki.biligame.com/starengine/'}
@@ -39,7 +52,7 @@ def parse_tasks(w):
         out.append(names)
     if out:
         return out
-    # 格式B：==地图任务== 下的 wikitable，第一列 “任务”
+    # 格式B：==地图任务== 下的 wikitable，第一列 "任务"
     sec = re.search(r'==\s*地图任务\s*==(.*?)(?=\n==[^=]|$)', w, re.S)
     if not sec:
         return []
@@ -54,32 +67,60 @@ def parse_tasks(w):
         first = re.sub(r'\[\[[^\]|]*\|([^\]]*)\]\]', r'\1', first)
         first = re.sub(r'\[\[([^\]]*)\]\]', r'\1', first)
         first = re.sub(r"''+", '', first).strip()
+        first = re.sub(r'\s*\d\\\d+\s*$', '', first).strip()   # 去掉「0\3」这类目标数
         if first and first not in ('任务', '奖励'):
             names.append(first)
     return [names] if names else []
 
 
-res, missing = {}, []
-for mid, name in MAPS.items():
-    title = WIKI_TITLE.get(mid, name)
-    try:
-        w = raw(title)
-        tasks = parse_tasks(w)
-    except Exception as e:
-        missing.append((name, str(e)[:60]))
-        continue
-    if not tasks:
-        missing.append((name, '页面里没找到地图任务段'))
-        continue
-    normal = tasks[0]
-    hard = tasks[1] if len(tasks) > 1 else tasks[0]
-    res[str(mid)] = {'name': name, 'title': title, 'normal': normal, 'hard': hard}
-    print('◆ %-14s (%s)  普通 %d 个任务:' % (name, title, len(normal)))
-    for i, t in enumerate(normal, 1):
-        print('      %d. %s' % (i, t))
+def main():
+    apply = '--apply' in sys.argv
+    f = asset('assets', 'data', 'missions.json')
+    cur = json.loads(f.read_text(encoding='utf-8')) if f.exists() else {}
+    fetched, missing, changed, locked = {}, [], [], []
+    for mid, name in MAPS.items():
+        title = WIKI_TITLE.get(mid, name)
+        try:
+            tasks = parse_tasks(raw(title))
+        except Exception as e:
+            missing.append((name, str(e)[:60]))
+            continue
+        if not tasks:
+            missing.append((name, '页面里没找到地图任务段'))
+            continue
+        normal = tasks[0]
+        hard = tasks[1] if len(tasks) > 1 else tasks[0]
+        rec = dict(cur.get(str(mid)) or {})
+        if rec.get('tasks'):
+            # 已按客户端任务 ID 校准过的地图，Wiki 的顺序不可信（幽魂暗巷就是错位的）
+            locked.append(rec.get('name') or name)
+            continue
+        rec.update({'name': rec.get('name') or name, 'title': title,
+                    'normal': normal, 'hard': hard})
+        fetched[str(mid)] = rec
+        before = cur.get(str(mid)) or {}
+        if before.get('normal') != normal or before.get('hard') != hard:
+            changed.append((mid, rec.get('name'), before.get('normal') or [], normal))
 
-Path(__file__).resolve().parents[1].joinpath('assets', 'data', 'missions.json').write_text(
-    json.dumps(res, ensure_ascii=False, indent=1), encoding='utf-8')
-print('\n已写入 assets/data/missions.json（%d 张地图）' % len(res))
-if missing:
-    print('没抓到:', missing)
+    print('抓到 %d 张地图；缺失 %d 张 %s' % (len(fetched), len(missing), missing or ''))
+    print('任务名有变化的地图：%d 张' % len(changed))
+    for mid, name, old, new in changed:
+        print('   ◆ %s %s' % (mid, name))
+        print('      旧：%s' % (old or '（空）'))
+        print('      新：%s' % new)
+    untouched = [k for k in cur if k not in fetched]
+    print('保留不动的地图（Wiki 里没有）：%s' % ', '.join(sorted(untouched)))
+    if locked:
+        print('已按客户端校准、跳过 Wiki 的地图：%s' % '、'.join(locked))
+
+    if not apply:
+        print('\n（只是报告；要写入加 --apply）')
+        return
+    cur.update(fetched)
+    cur = {k: cur[k] for k in sorted(cur, key=lambda x: (len(x), x))}
+    f.write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding='utf-8')
+    print('\n已写入 %s（共 %d 张地图）' % (f, len(cur)))
+
+
+if __name__ == '__main__':
+    main()

@@ -131,14 +131,20 @@ MAPS = _load_maps()          # 读 missions.json，故排在 _load_missions 之�
 
 
 def mission_names(mid, mission_ids):
-    """{第几个任务(1基): 任务名}"""
+    """{第几个任务(1基): 任务名}
+
+    优先按任务 ID 查 `tasks`：同一张图不同对局的任务集可能不一样（幽魂暗巷有一套 6 选 5），
+    按序号套 `normal` 列表会错位。没有 `tasks` 时退回：任务 ID 排序后取 `normal` 的第 i 个。
+    """
+    if not mission_ids:
+        return {}
     rec = MISSIONS.get(str(mid)) or {}
-    tasks = rec.get('normal') or []
-    out = {}
-    for i, _mid in enumerate(sorted(mission_ids or []), 1):
-        if i <= len(tasks):
-            out[i] = tasks[i - 1]
-    return out
+    ids = sorted(mission_ids, key=lambda x: int(x) if str(x).isdigit() else 0)
+    tasks = rec.get('tasks') or {}
+    if tasks:
+        return {i: tasks[str(k)] for i, k in enumerate(ids, 1) if str(k) in tasks}
+    names = rec.get('normal') or []
+    return {i: names[i - 1] for i in range(1, len(ids) + 1) if i <= len(names)}
 
 
 # ══════════ 皮肤 / 装扮（缺位法）══════════
