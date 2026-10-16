@@ -19,22 +19,41 @@
         background:var(--bg); color:var(--ink); font-size:14px;
         -webkit-font-smoothing:antialiased; overflow:hidden; }
   #app{ display:flex; height:100vh; }
+  /* 顶栏细进度条：后端调用超过 0.35s 才亮（短调用不闪），亮时走不确定进度 */
+  #topbar{ position:fixed; top:0; left:0; right:0; height:2px; z-index:200;
+           opacity:0; transition:opacity .2s; pointer-events:none; }
+  #topbar.on{ opacity:1; }
+  #topbar i{ display:block; height:100%; width:34%; border-radius:2px; transform:translateX(-100%);
+             background:linear-gradient(90deg, rgba(198,161,91,0), #C6A15B 45%, rgba(198,161,91,0)); }
+  #topbar.on i{ animation:tbar 1.05s cubic-bezier(.45,.05,.55,.95) infinite; }
+  @keyframes tbar{ from{ transform:translateX(-100%); } to{ transform:translateX(385%); } }
+  @media (prefers-reduced-motion: reduce){
+    #topbar.on i{ animation:none; width:100%; transform:none; opacity:.45; }
+  }
 
   /* ── 侧边栏 ── */
   #side{ width:184px; background:var(--side); flex:0 0 184px;
-         padding:24px 0 0; display:flex; flex-direction:column; }
+         padding:24px 0 0; display:flex; flex-direction:column; position:relative; }
   #side h1{ font-size:15.5px; padding:0 20px 20px; letter-spacing:.6px; font-weight:700; }
   #side h1 span{ color:var(--accent); }
   .nav{ padding:10px 20px; color:var(--dim); cursor:pointer; font-size:13.5px;
-        border-left:3px solid transparent; transition:.15s; }
+        border-left:3px solid transparent; transition:color .15s;
+        position:relative; z-index:1; }      /* 压在选中框之上，免得文字被半透明白纱冲淡 */
   .nav:hover{ color:var(--ink); }
+  /* 选中框：跟当前页滑动。位置由 JS 按 .nav.on 算，首次定位不加过渡（免得开局滑一下） */
+  .nav-ind{ position:absolute; top:0; left:0; right:0; height:0; opacity:0;
+            border-left:3px solid var(--accent); background:rgba(255,255,255,.55);
+            pointer-events:none; }
+  .nav-ind.ready{ opacity:1; transition:transform .24s cubic-bezier(.22,.61,.36,1); }
+  @media (prefers-reduced-motion: reduce){
+    .nav-ind.ready{ transition:none; }
+  }
   /* 登录页那条「从本机游戏补全头像资源」的进度：后台跑，不挡登录 */
   .arthint{ margin-top:16px; font-size:12px; color:#8C8577; display:flex;
             align-items:center; gap:8px; line-height:1.5; }
   .arthint .bar{ flex:0 0 110px; height:4px; border-radius:2px; background:#E7E1D3; overflow:hidden; }
   .arthint .bar>i{ display:block; height:100%; width:0; background:#C9A26B; transition:width .3s; }
-  .nav.on{ color:var(--ink); border-left-color:var(--accent);
-           background:rgba(255,255,255,.55); font-weight:600; }
+  .nav.on{ color:var(--ink); font-weight:600; }
   .nav.lock{ opacity:.32; pointer-events:none; }
   #who{ margin-top:auto; padding:14px 20px 18px; font-size:11px; color:#A79F91;
         line-height:1.55; }
@@ -43,7 +62,9 @@
           justify-content:center; background:rgba(62,56,46,.30); transition:opacity .18s; }
   .modal.hide{ opacity:0; pointer-events:none; }
   .mbox{ width:356px; background:#FCFAF6; border-radius:14px; padding:22px 24px 18px;
-         box-shadow:0 18px 50px rgba(70,60,40,.26); }
+         box-shadow:0 18px 50px rgba(70,60,40,.26);
+         transition:transform .18s cubic-bezier(.22,.61,.36,1), opacity .18s; }
+  .modal.hide .mbox{ transform:scale(.97) translateY(6px); opacity:0; }
   .mtitle{ font-size:15px; font-weight:600; color:#4E4739; margin-bottom:9px; }
   .mtext{ font-size:12.5px; color:#7E7565; line-height:1.9; margin-bottom:19px; }
   .mbtns{ display:flex; gap:9px; justify-content:flex-end; }
@@ -78,7 +99,10 @@
 
   /* ── 主区 ── */
   #main{ flex:1; overflow-y:auto; padding:26px 32px 44px; }
-  .pane{ display:none; } .pane.on{ display:block; }
+  .pane{ display:none; } .pane.on{ display:block; animation:paneIn .1s ease-out; }
+  /* 只做极轻的软化：整页做淡入会被读成「眨一下」，位移则会让吸顶表头跟着抖。切换的节奏交给侧边栏滑块 */
+  @keyframes paneIn{ from{ opacity:.88; } to{ opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .pane.on{ animation:none; } }
   h2{ font-size:19px; margin-bottom:4px; font-weight:700; }
   .sub{ color:var(--dim); font-size:12.5px; margin-bottom:20px; }
   #p-match h2{ margin-bottom:16px; }   /* 没有小字了，标题和框拉开一点 */
@@ -369,7 +393,9 @@
      自带 8px 上内边距，钉住时不贴死、未钉住时不多占，两种状态观感一致。 */
   .htab thead th{ border-bottom:1px solid var(--line);
                   padding:8px 0 6px; position:sticky; top:0; z-index:3;
-                  background:#FCFAF6; box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
+                  background:#FCFAF6; transition:box-shadow .18s; }
+  /* 挂上 .stuck 才浮阴影：只在表头真钉住时提示「已吸顶」 */
+  .htab.stuck thead th{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   .htab th.hrt{ width:56px; font-size:11.5px; font-weight:600; color:#B0A995; text-align:left; }
   .htab tbody th.hrt{ color:#5E574A; }
   .hpl{ display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 4px;
@@ -498,10 +524,20 @@
              stroke-linecap:round; stroke-linejoin:round; }
   .sbtn.big svg{ width:13px; height:13px; }
   .srow{ display:flex; align-items:center; gap:8px; margin:2px 0 10px; font-size:12px; color:var(--dim); }
-  .stabs{ display:inline-flex; gap:2px; background:#EDE7DA; padding:2px; border-radius:8px; }
-  .stab{ padding:2px 9px; border-radius:6px; cursor:pointer; color:#8C8270; font-style:normal; }
+  .stabs{ display:inline-flex; gap:2px; background:#EDE7DA; padding:2px; border-radius:8px;
+          position:relative; }
+  .stab{ padding:2px 9px; border-radius:6px; cursor:pointer; color:#8C8270; font-style:normal;
+         position:relative; z-index:1; transition:color .15s; }
   .stab:hover{ color:#B4633A; }
-  .stab.on{ background:#FFFDF8; color:#B4633A; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  /* 选中块：跟页签滑。位置由 JS 按 .stab.on 算，首次定位不加过渡 */
+  .stabs .thumb{ position:absolute; top:2px; left:2px; bottom:2px; width:0; border-radius:6px;
+                 background:#FFFDF8; box-shadow:0 1px 2px rgba(0,0,0,.06); pointer-events:none; }
+  .stabs .thumb.ready{ transition:transform .2s cubic-bezier(.22,.61,.36,1),
+                                   width .2s cubic-bezier(.22,.61,.36,1); }
+  .stab.on{ color:#B4633A; font-weight:600; }
+  @media (prefers-reduced-motion: reduce){
+    .stabs .thumb.ready{ transition:none; }
+  }
   #p-skin h2{ margin-bottom:2px; }
   #p-skin .sub{ margin-bottom:6px; }
   #p-skin .box{ padding-top:8px; }
@@ -522,6 +558,7 @@
 </style>
 </head>
 <body>
+<div id="topbar"><i></i></div>
 <div id="modal" class="modal hide">
   <div class="mbox">
     <div class="mtitle" id="modalTitle">确定吗？</div>
@@ -555,6 +592,7 @@
 <div id="app">
   <div id="side">
     <h1>星趴<span>档案</span></h1>
+    <div class="nav-ind" id="navInd"></div>
     <div class="nav on" data-p="login" id="navLogin">登录</div>
     <div class="nav lock" id="navProfile" data-p="profile">我的信息</div>
     <div class="nav lock" id="navMatch" data-p="match">最近对局</div>
@@ -666,6 +704,7 @@
       <div class="sub" id="skinSub">按角色列出 · 彩色为已拥有，灰色为未拥有</div>
       <div class="srow">
         <span class="stabs">
+          <i class="thumb" id="skThumb"></i>
           <i class="stab on" id="skb_id" onclick="skSort('id')">角色编号</i>
           <i class="stab" id="skb_have" onclick="skSort('have')">已拥有换装</i>
           <i class="stab" id="skb_total" onclick="skSort('total')">角色换装数</i>
@@ -694,9 +733,62 @@ function nav(p){
   document.querySelectorAll('.pane').forEach(e=>e.classList.remove('on'));
   document.querySelectorAll('.nav').forEach(e=>e.classList.toggle('on', e.dataset.p===p));
   $('#p-'+p).classList.add('on');
+  const m = $('#main');
+  if(m) m.scrollTop = 0;    // 与页签同理：切页回顶部。沿用上一页的滚动位会被夹回去，看着像跳一下
+  syncNavInd();
+  syncStabThumb();          // 面板刚显示出来才有尺寸，必须在这儿补算
 }
 document.querySelectorAll('.nav').forEach(e=>e.onclick=()=>{
   if(!e.classList.contains('lock')) nav(e.dataset.p); });
+
+// ── 选中框滑动 ──
+//  位置按当前 .on 元素的 offsetTop / offsetLeft 算（#side 与 .stabs 是定位祖先）。
+//  首次定位先不挂 .ready，免得开局从零点滑一下。
+function syncNavInd(){
+  const side = $('#side'), ind = $('#navInd');
+  if(!side || !ind) return;
+  const act = [...side.querySelectorAll('.nav')].find(e=>e.classList.contains('on'));
+  if(!act || !act.offsetHeight || !side.offsetHeight){ ind.style.opacity = 0; return; }
+  ind.style.height = act.offsetHeight + 'px';
+  ind.style.transform = 'translateY(' + act.offsetTop + 'px)';
+  requestAnimationFrame(()=>ind.classList.add('ready'));
+}
+function syncStabThumb(){
+  const wrap = document.querySelector('#p-skin .stabs'), th = $('#skThumb');
+  if(!wrap || !th) return;
+  if(!wrap.offsetWidth) return;      // 面板还藏着时量不准，等切过去再算
+  const act = wrap.querySelector('.stab.on');
+  if(!act || !act.offsetWidth) return;
+  th.style.width = act.offsetWidth + 'px';
+  th.style.transform = 'translateX(' + (act.offsetLeft - 2) + 'px)';
+  requestAnimationFrame(()=>th.classList.add('ready'));
+}
+if(window.ResizeObserver){          // 开机显示 / 窗口缩放 / 字体加载完都会触发重排
+  const _s = $('#side'); if(_s) new ResizeObserver(syncNavInd).observe(_s);
+  const _w = document.querySelector('#p-skin .stabs');
+  if(_w) new ResizeObserver(syncStabThumb).observe(_w);
+}
+window.addEventListener('resize', ()=>{ syncNavInd(); syncStabThumb(); });
+window.addEventListener('load', ()=>{ syncNavInd(); syncStabThumb(); });
+
+// ── 表格吸顶阴影 ──
+//  表头真钉住时才浮出阴影。scroll 不冒泡，用捕获阶段全局听一次就够。
+//  滚动容器往上找最近一个能滚的（复盘弹窗是 .rvbody，页面内的是 #main）。
+function scrollParent(el){
+  for(let p = el.parentElement; p; p = p.parentElement){
+    if(p.scrollHeight > p.clientHeight + 2){
+      const oy = getComputedStyle(p).overflowY;
+      if(oy === 'auto' || oy === 'scroll') return p;
+    }
+  }
+  return document.scrollingElement;
+}
+document.addEventListener('scroll', ()=>{
+  document.querySelectorAll('.htab').forEach(t=>{
+    const box = scrollParent(t);
+    t.classList.toggle('stuck', !!box && box.scrollTop > 2);
+  });
+}, true);
 function say(t, cls){ const m=$('#msg'); m.textContent=t; m.className=cls||''; }
 function fmtTime(ts){
   if(!ts) return '—';
@@ -1049,6 +1141,46 @@ async function artPoll(){
 window.addEventListener('pywebviewready', ()=>setTimeout(()=>boot(true), 120));
 window.addEventListener('pywebviewready', ()=>setTimeout(channelState, 600));
 window.addEventListener('pywebviewready', ()=>setTimeout(artPoll, 300));
+
+// ── 顶栏细进度条 ──
+//  把 api 包一层：有请求在飞才点亮，短于 0.35s 的调用不闪（登录页会连着发好几个短请求）。
+(function(){
+  const bar = document.getElementById('topbar');
+  if(!bar) return;
+  let inflight = 0, timer = null;
+  const bump = n => {
+    inflight = Math.max(0, inflight + n);
+    if(inflight > 0){
+      if(!timer) timer = setTimeout(()=>{ if(inflight > 0) bar.classList.add('on'); }, 350);
+    }else{
+      clearTimeout(timer); timer = null; bar.classList.remove('on');
+    }
+  };
+  const wrap = api => {
+    if(!api || api.__busyWrapped) return api;
+    const out = new Proxy(api, { get(t, k){
+      const v = t[k];
+      if(typeof v !== 'function') return v;
+      return function(...a){
+        bump(1);
+        try{
+          const r = v.apply(t, a);
+          if(r && typeof r.then === 'function')
+            return r.then(x=>{ bump(-1); return x; }, e=>{ bump(-1); throw e; });
+          bump(-1); return r;
+        }catch(e){ bump(-1); throw e; }
+      };
+    }});
+    try{ Object.defineProperty(out, '__busyWrapped', { value: true }); }catch(e){}
+    return out;
+  };
+  const install = ()=>{
+    if(!window.pywebview || !window.pywebview.api) return;
+    try{ window.pywebview.api = wrap(window.pywebview.api); }catch(e){}
+  };
+  window.addEventListener('pywebviewready', install);
+  install();
+})();
 function unlock(){
   const _ns=document.getElementById('navSkin'); if(_ns) _ns.classList.remove('lock');
   ['navProfile','navMatch','navExport','navQuery'].forEach(id=>$('#'+id).classList.remove('lock'));
@@ -1203,6 +1335,7 @@ function renderSkins(d){
     const t = document.getElementById('skb_' + k);
     if(t) t.className = 'stab' + (s.key === k ? ' on' : '');
   });
+  syncStabThumb();
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
 function rgTag(region){                        // 区服标签：同一账号在两边是两套数据
