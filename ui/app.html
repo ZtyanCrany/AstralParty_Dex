@@ -1385,7 +1385,7 @@ function render(d){
       <div class="mhead" onclick="toggleMatch(${i})">
         <div class="t">${fmtTime(r.time)}</div>
         <div class="m" id="map${i}">读取中…</div>
-        <div class="res ${r.rank===1?'win':'lose'}">${r.rank===1?'胜利':(r.rank?'第'+r.rank+'名':'—')}</div>
+        <div class="res ${resOf(r.rank, r.mapType, r.players).win?'win':'lose'}">${resOf(r.rank, r.mapType, r.players).text}</div>
         <div class="h">${r.hero}</div>
         <div class="arw">▶</div>
       </div>
@@ -1510,7 +1510,8 @@ function render(d){
     }
 
     // ① 按轮次（最高值橙红加粗；该轮死了 → 承伤后标「（似了）」）
-    const KS = [['kill','击杀'],['dmg','伤害'],['inj','承伤'],['gold','星币'],['move','步数']];
+    // 死亡单独成列：一轮内可能死两次，只标「似了」会把次数吞掉
+    const KS = [['kill','击杀'],['dmg','伤害'],['inj','承伤'],['deaths','死亡'],['gold','星币'],['move','步数']];
     const best = {};
     KS.forEach(kv => { best[kv[0]] = Math.max(0, ...((p.rounds||[]).map(r => r[kv[0]] || 0))); });
     let rows = '';
@@ -1717,6 +1718,18 @@ function qesc(v){
 }
 // 难度标（颜色区分）：0 普通 / 1 困难 / 2 噩梦 / 3 疯狂 / 4 极限
 const DIFF_NAME = ['普通', '困难', '噩梦', '疯狂', '极限'];
+// 胜负标：PVE 的 rank 是「队伍结果」（1=胜，其余=负），不是名次 ——
+// 客户端同一个判断见 UIAccount_Button_FightData（BattleConfig.IsPVE(mapType) ? WIN/LOSE : 名次）
+// BattleConfig 在没反编译到的基础程序集里，这里用两层判据：模式表里的 PVE 模式，或「四名玩家 rank 全同」
+const PVE_TYPES = [2, 4, 5, 6, 9];
+function resOf(rank, mapType, players){
+  const r = Number(rank) || 0;
+  const ranks = (players || []).map(p => Number(p.rank) || 0).filter(x => x > 0);
+  const sameRank = ranks.length > 1 && ranks.every(x => x === ranks[0]);
+  if(PVE_TYPES.indexOf(Number(mapType) || 0) >= 0 || sameRank)
+    return {win: r === 1, text: r === 1 ? '胜利' : (r ? '失败' : '—')};
+  return {win: r === 1, text: r === 1 ? '胜利' : (r ? '第' + r + '名' : '—')};
+}
 function dChip(n){
   if(n === null || n === undefined || n === '') return '';
   const v = Number(n);
@@ -1797,7 +1810,7 @@ async function doQuery(refresh, text){
       <div class="mhead" onclick="toggleQ(${i})">
         <div class="t">${qDate(rec.time)}</div>
         <div class="m${rec.map_name ? ' got' : ''}" id="qmap${i}">${qesc(rec.map_name || '—')}${dChip(rec.difficulty)}</div>
-        <div class="res ${rec.rank===1?'win':'lose'}">${rec.rank===1?'胜利':(rec.rank?'第'+rec.rank+'名':'—')}</div>
+        <div class="res ${resOf(rec.rank, rec.mapType).win?'win':'lose'}">${resOf(rec.rank, rec.mapType).text}</div>
         <div class="h">${qesc(rec.hero || '')}</div>
         <div class="arw">▶</div>
       </div>

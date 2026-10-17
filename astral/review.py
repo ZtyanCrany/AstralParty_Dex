@@ -4,12 +4,13 @@
     from astral.review import build_review
     rv = build_review(path)
 
-    rv['players'][i]['rounds']      [{round, kill, dmg, inj, gold, move, died}]
+    rv['players'][i]['rounds']      [{round, kill, dmg, inj, gold, move, died, deaths}]
     rv['players'][i]['chip_events'] [{round, source, candidates, picked, refresh, ...}]
 
 设计要点：
 · cond 是本局累计 → 每轮数据 = 本轮末快照 − 上轮末快照
-· 死亡 = 该轮 total_die / selfDie 增量 > 0
+· 死亡 = 该轮 total_die 增量（可 >1，一轮内死两次不合并）；died 只是「本轮死过」的标记
+· selfDie 不计入死亡：结算界面的「死亡」列就是 total_die，两者相加会与官方数字对不上
 · 残轮（击败 BOSS 即结束）属正常情况，不产生告警
 · 筹码来源三条路：同帧多人=任务 / 单独=升星 / buyRelicNum 增长帧=商店
 """
@@ -555,16 +556,18 @@ def _rounds_for(rp, uid):
             return v.get(k, 0) - (prev.get(k, 0) if prev else 0)
         kill = d('kill_count') + d('kill_pve_monster') + d('kill_thief')
         gold = d('gold') + (init_gold if rnd == 1 else 0)
+        deaths = max(d('total_die'), 0)
         rows.append({
             'round': rnd,
             'kill': max(kill, 0), 'dmg': max(d('total_damage'), 0),
             'inj': max(d('total_injured'), 0), 'gold': max(gold, 0),
             'move': max(d('movePoint'), 0),
-            'died': (d('total_die') > 0 or d('selfDie') > 0),
+            'died': deaths > 0, 'deaths': deaths,
         })
         prev = v
     total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move')}
-    total['died'] = sum(1 for r in rows if r['died'])
+    total['died'] = sum(r['deaths'] for r in rows)
+    total['deaths'] = total['died']        # 轮次表用 deaths 列，合计行同名
     return rows, total
 
 
