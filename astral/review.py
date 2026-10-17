@@ -566,8 +566,7 @@ def _rounds_for(rp, uid):
         })
         prev = v
     total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move')}
-    total['died'] = sum(r['deaths'] for r in rows)
-    total['deaths'] = total['died']        # 轮次表用 deaths 列，合计行同名
+    total['died'] = sum(r['deaths'] for r in rows)   # 次数而非「死过的轮数」
     return rows, total
 
 

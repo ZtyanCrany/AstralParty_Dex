@@ -1510,8 +1510,7 @@ function render(d){
     }
 
     // ① 按轮次（最高值橙红加粗；该轮死了 → 承伤后标「（似了）」）
-    // 死亡单独成列：一轮内可能死两次，只标「似了」会把次数吞掉
-    const KS = [['kill','击杀'],['dmg','伤害'],['inj','承伤'],['deaths','死亡'],['gold','星币'],['move','步数']];
+    const KS = [['kill','击杀'],['dmg','伤害'],['inj','承伤'],['gold','星币'],['move','步数']];
     const best = {};
     KS.forEach(kv => { best[kv[0]] = Math.max(0, ...((p.rounds||[]).map(r => r[kv[0]] || 0))); });
     let rows = '';
