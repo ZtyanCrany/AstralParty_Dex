@@ -98,8 +98,11 @@
   .lastlogin .forget:hover{ color:#B4633A; text-decoration:underline; }
 
   /* ── 主区 ── */
-  #main{ flex:1; overflow-y:auto; padding:26px 32px 44px; }
-  .pane{ display:none; } .pane.on{ display:block; animation:paneIn .16s ease-out; }
+  /* 上内边距放在 .pane 上而不是 #main：sticky 是相对滚动容器的 padding box 定位的，
+     留在 #main 上会让吸顶表头永远离顶 26px，底下露出滚动内容（看着像漏风）。 */
+  #main{ flex:1; overflow-y:auto; padding:0 32px 44px; }
+  .pane{ display:none; padding-top:26px; }
+  .pane.on{ display:block; animation:paneIn .16s ease-out; }
   /* 切页淡入：只做 opacity。位移会让面板变成定位包含块，里面吸顶表头、面板内的 fixed 提示条都会跟着抖 */
   @keyframes paneIn{ from{ opacity:0; } to{ opacity:1; } }
   @media (prefers-reduced-motion: reduce){ .pane.on{ animation:none; } }
@@ -339,8 +342,13 @@
   .rvhead .rx:hover{ background:#EDE7DA; color:var(--ink); }
   .rvbody{ padding:0 20px 20px; overflow-y:auto; }
   /* 对局统计 ⇄ 手牌 切换：淡入 + 轻微上移，别硬切 */
-  @keyframes rvIn{ from{ opacity:.2; transform:translateY(7px); } to{ opacity:1; transform:none; } }
-  .rvbody.rvanim{ animation:rvIn .17s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes rvIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  @keyframes rvInR{ from{ opacity:0; transform:translateX(14px); } to{ opacity:1; transform:none; } }
+  @keyframes rvInL{ from{ opacity:0; transform:translateX(-14px); } to{ opacity:1; transform:none; } }
+  .rvbody.rvanim{ animation:rvIn .2s cubic-bezier(.2,.7,.3,1) both; }
+  .rvbody.rvanim.rvr{ animation-name:rvInR; }
+  .rvbody.rvanim.rvl{ animation-name:rvInL; }
+  @media (prefers-reduced-motion: reduce){ .rvbody.rvanim{ animation:none; } }
   /* 顶部留白：内容区自身不留，改由第一个小节承担，
      这样黏性行才能一直贴住内容区顶部（不会露出滑过去的卡牌）。
      手牌视图的留白交给黏性行自己的内边距，保证「钉住」与「未钉住」上下一致 */
@@ -355,10 +363,8 @@
              position:sticky; top:0; z-index:4; background:#FCFAF6;
              transition:box-shadow .18s; }
   .rvsec>h4.stuck{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
-  /* 逐轮明细里的「第 n 轮」：钉在小节标题下面 */
-  .rd>h5{ position:sticky; top:var(--rvh, 34px); z-index:3; background:#FCFAF6;
-          padding:5px 0; transition:box-shadow .18s; }
-  .rd>h5.stuck{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
+  /* 「每轮手牌」这块标题不吸顶（表头自己钉住就够了），别让上空留一条 */
+  .rvsec.nostick>h4{ position:static; box-shadow:none; }
   /* ★ 内容跟标题文字对齐：标题文字左缘 = 3px 竖条 + 9px 内距 = 12px */
   .rvsec>*:not(h4){ margin-left:12px; }
   .rvsec .rtab{ width:calc(100% - 12px); }
@@ -407,7 +413,7 @@
   /* 玩家页签（表头）：向下滚动时钉在弹窗顶部。
      自带 8px 上内边距，钉住时不贴死、未钉住时不多占，两种状态观感一致。 */
   .htab thead th{ border-bottom:1px solid var(--line);
-                  padding:8px 0 6px; position:sticky; top:var(--rvh, 34px); z-index:3;
+                  padding:8px 0 6px; position:sticky; top:0; z-index:3;
                   background:#FCFAF6; transition:box-shadow .18s; }
   /* 挂上 .stuck 才浮阴影：只在表头真钉住时提示「已吸顶」 */
   .htab.stuck thead th{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
@@ -880,7 +886,7 @@ document.addEventListener('scroll', ()=>{
     t.classList.toggle('stuck', !!box && box.scrollTop > 2 && stuckNow(head, box));
   });
   // 复盘弹窗里的小节标题 / 第 n 轮：只在真钉住时浮阴影
-  document.querySelectorAll('.rvbody .rvsec>h4, .rvbody .rd>h5').forEach(h=>{
+  document.querySelectorAll('.rvbody .rvsec>h4').forEach(h=>{
     const box = scrollParent(h);
     h.classList.toggle('stuck', !!box && box.scrollTop > 2 && stuckNow(h, box));
   });
@@ -1734,13 +1740,14 @@ function render(d){
     }
     const b = document.getElementById('rvBody');
     b.innerHTML = html;
-    // 吸顶标题的实际高度喂给下面的表头 / 第 n 轮，让它们正好贴着标题下沿
-    const h4 = b.querySelector('.rvsec>h4');
-    if(b.style && b.style.setProperty)          // 静态检查用的假 DOM 没有 setProperty
-      b.style.setProperty('--rvh', (h4 ? h4.offsetHeight : 0) + 'px');
-    b.classList.remove('rvanim');
+    // 切页签/切视图：按方向做一个淡入 + 轻推（统计→手牌 从右侧进，反之从左侧）
+    const prev = window.__rvPrevTab;
+    const dir = (prev && prev !== S.tab) ? (S.tab === 'hand' ? 'r' : 'l') : '';
+    window.__rvPrevTab = S.tab;
+    b.classList.remove('rvanim', 'rvr', 'rvl');
     void b.offsetWidth;                 // 强制重排，动画才会从头播
     b.classList.add('rvanim');
+    if(dir) b.classList.add(dir === 'r' ? 'rvr' : 'rvl');
     b.scrollTop = 0;   // 切页签 / 切视图都回到顶部，别停在上一处滚动位置
   };
   window.rvTab = (t) => { window.__rvState.tab = t; window.__rvState.detail = null; window.drawRv(); };
@@ -1763,7 +1770,7 @@ function render(d){
     const ps = rv.players || [];
     const rows = rv.card_rounds || [];
     if(!rows.length)
-      return '<div class="rvsec"><h4>每轮手牌</h4>' +
+      return '<div class="rvsec nostick"><h4>每轮手牌</h4>' +
              '<div class="rvfoot">这局回放没解析到手牌数据</div></div>';
     const grp = (label, cs) => (!cs || !cs.length) ? '' :
       '<div class="hgrp"><span class="hlab">' + label + '</span>' +
@@ -1787,7 +1794,7 @@ function render(d){
       });
       body += '</tr>';
     });
-    return '<div class="rvsec"><h4>每轮手牌</h4>' +
+    return '<div class="rvsec nostick"><h4>每轮手牌</h4>' +
       '<div class="rvhint" style="margin:-2px 0 8px 12px">' +
       '点玩家头像或名字，看他的逐轮明细</div>' +
       '<table class="htab"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>' +
