@@ -1080,6 +1080,34 @@ function phAv(){
 }
 function avOf(id){ return AV[String(id)] || phAv(); }
 
+// ── 首屏优先：先把「我的信息」角色排行前几位的头像提出来，别等全量扫描 ──
+//   后端 art_priority_start 只提还缺的，提完一张就写进 AV 并重绘排行表。
+let __warmed = new Set();
+async function warmAvatars(ids){
+  const need = [...new Set((ids || []).map(String))]
+      .filter(t => t && t !== 'Start' && !AV[t] && !__warmed.has(t));
+  if (!need.length) return;
+  need.forEach(t => __warmed.add(t));
+  try{ await window.pywebview.api.ensure_avatars(need); }catch(e){ return; }
+  const t0 = Date.now();
+  const pull = async () => {
+    let got = null;
+    try{ got = await window.pywebview.api.get_avatars(need.filter(t => !AV[t])); }catch(e){}
+    if (got && Object.keys(got).length){
+      Object.assign(AV, got);
+      if (window.__profile) { try{ window.paintHeroes(); }catch(e){} }
+    }
+  };
+  while (Date.now() - t0 < 60000){
+    await pull();
+    if (need.every(t => AV[t])) return;
+    let st = null;
+    try{ st = await window.pywebview.api.avatar_progress(); }catch(e){}
+    if (st && st.done && !st.running){ await pull(); return; }
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+
 function modalShow(title, text, yesText, cb){
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalText').textContent = text;
@@ -1436,6 +1464,14 @@ function render(d){
   ).join('');
 
   window.paintHeroes();                       // 角色使用排行（默认场次从高到低，表头可排序）
+  // 首屏优先：排行靠前的几位先提头像（其余靠后台全量扫描补）
+  try{
+    const top = (d.heroes || []).slice()
+        .filter(h => h.owned !== false)
+        .sort((a, b) => (Number(b.n) || 0) - (Number(a.n) || 0))
+        .slice(0, 8).map(h => h.id);
+    warmAvatars(top);
+  }catch(e){}
 
   const mmax = Math.max(...d.maps.map(m=>m.n), 1);
   $('#maps').innerHTML = d.maps.map(m=>`<tr>

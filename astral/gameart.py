@@ -426,7 +426,14 @@ def _scan_one(path):
                 im = trim_and_resize(im, _W['ph'])
             elif max(im.size) > _W['av']:
                 im = im.resize((_W['av'], _W['av']), 1)
-            im.convert('RGBA').save(Path(_W['dirs'][sub]) / (tag + '.png'))
+            # 先写 .tmp 再原子替换：主线程可能同时在读这些 png（我的信息首屏优先提取），
+            #   直接 save 会让读到半张图 / 两个线程互相踩。
+            out = Path(_W['dirs'][sub]) / (tag + '.png')
+            tmp = out.with_name(out.name + '.tmp%d' % os.getpid())
+            # ★ 必须显式 format='PNG'：PIL 是按扩展名猜格式的，.tmpNNN 这种后缀会直接抛
+            #   「unknown file extension」，而这个异常被外层 except 吞掉 —— 表现就是「一张都提不出来」。
+            im.convert('RGBA').save(tmp, format='PNG')
+            os.replace(tmp, out)
             hits.append(name)
         except Exception:
             continue
@@ -435,11 +442,20 @@ def _scan_one(path):
 
 # ══════════════════ 主流程 ══════════════════
 
-def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE, ph_size=PH_SIZE):
+def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE, ph_size=PH_SIZE,
+           workers=None, save_state=True, ignore_watermark=False, order='mtime'):
     """确保 userdata/assets 里备齐 hero_ids 的角色头像与立绘头像。
 
     progress(阶段文字, 已完成, 总数) —— 会在扫描过程中被调用（可能很密集，调用方自行节流）。
     budget_s —— 单次最多跑多少秒（到点就停，下次启动接着扫）；None=不限。
+    workers —— 并行进程数（None=按 CPU 自动）。首屏优先提取要用小值，别和全量扫描抢满 CPU。
+    order —— 'mtime' = 按更新时间（默认，配合水位线）；'size' = 按体积从小到大。
+             头像图很小（几十 KB），首屏优先用 size 能在很小的读取量内就撞上，几秒出图。
+             注意：顺序一变水位线就失去意义了，所以 order='size' 时务必 save_state=False。
+    ignore_watermark —— 无视水位线，从头找（首屏优先用：文件被删过 / 换了游戏版本时也能补上；
+                       因为找到就停，代价是有界的）。
+    save_state —— 是否更新扫描水位线。并发跑两套扫描时必须关掉，否则水位线会被推到
+                  另一套还没扫到的位置，以后启动就会漏扫（这是真正会留坑的地方）。
     返回统计 dict（ok / game / found / missing / scanned / seconds / done）。
     """
     t0 = time.time()
@@ -459,7 +475,8 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
 
     if not game:
         say('没找到本机游戏，头像将用占位图', 0, 0)
-        _save_state(st)
+        if save_state:
+            _save_state(st)
         return {'ok': False, 'game': False, 'reason': 'no_game', 'found': 0, 'missing': 0,
                 'seconds': round(time.time() - t0, 1), 'done': True}
 
@@ -483,7 +500,8 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
     if not todo:
         st['scanned_at'] = time.time()
         st['catalog'] = catname
-        _save_state(st)
+        if save_state:
+            _save_state(st)
         say('头像资源已就绪（%d 项）' % len(need), len(need), len(need))
         return {'ok': True, 'game': True, 'reason': 'cached', 'found': 0,
                 'missing': 0, 'total': len(need),
@@ -498,7 +516,9 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
 
     files = bundle_files(cache, installs)
     wm = float(st.get('watermark') or 0)
-    fresh = [(p, mt) for p, mt in files if mt > wm]
+    fresh = list(files) if ignore_watermark else [(p, mt) for p, mt in files if mt > wm]
+    if order == 'size':
+        fresh.sort(key=lambda it: it[0].stat().st_size if hasattr(it[0], 'stat') else 0)
     n_total = len(fresh)
     say('准备提取头像资源…', 0, n_total)
 
@@ -518,7 +538,7 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
     pool = None
     try:
         from concurrent.futures import ProcessPoolExecutor
-        workers = max(1, min(WORKERS_MAX, (os.cpu_count() or 4) - 1))
+        workers = int(workers) if workers else max(1, min(WORKERS_MAX, (os.cpu_count() or 4) - 1))
         pool = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
                                    initargs=(dict(todo), dirs, av_size, ph_size))
         say('正在从本机游戏提取头像资源…（%d 进程并行，共 %d 个资源包）' % (workers, n_total), 0, n_total)

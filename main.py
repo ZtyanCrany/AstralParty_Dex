@@ -994,6 +994,67 @@ def art_scan_start():
     threading.Thread(target=work, daemon=True).start()
 
 
+# ── 首屏优先头像 ────────────────────────────────────────────
+# 「我的信息」是登录后第一眼看到的页面，但它要的头像和全量扫描（35 位，首次 ~26 秒）是一套。
+# 做法：登录后立刻按「角色使用排行前几名」单独提一次（只提还缺的），提完就重绘；
+#      全量扫描照旧在后台跑，补完剩下的角色。
+PRIO_STATE = {'running': False, 'tags': [], 'ready': [], 'n': 0, 'done': True}
+PRIO_LOCK = threading.Lock()
+
+
+def art_priority_start(tags):
+    """按需先提取指定角色头像；返回还需要提取的角色数（0 = 都已经有了）。"""
+    global AVATAR_DIR, PHOTO_DIR
+    ids = {str(k) for k in HERO}          # HERO 的键是 int，别拿 str 直接比
+    tags = [str(t) for t in (tags or []) if str(t) in ids][:12]
+    d = Path(str(AVATAR_DIR))
+    missing = [t for t in tags if not (d / (t + '.png')).exists()]
+    PRIO_STATE.update({'tags': tags, 'ready': [t for t in tags if t not in missing],
+                       'n': len(missing), 'done': not missing})
+    if not missing:
+        return 0
+
+    with PRIO_LOCK:
+        if PRIO_STATE.get('running'):
+            return len(missing)
+        PRIO_STATE.update({'running': True, 'done': False})
+
+    def work():
+        global AVATAR_DIR, PHOTO_DIR
+        try:
+            from astral import gameart
+
+            def prog(text, i, n):
+                PRIO_STATE['i'] = i
+                try:
+                    PRIO_STATE['ready'] = [t for t in tags if (Path(str(AVATAR_DIR)) / (t + '.png')).exists()]
+                except Exception:
+                    pass
+
+            # workers=2 / save_state=False：别和后台全量扫描抢 CPU，也别动扫描水位线
+            gameart.ensure(missing, progress=prog, workers=4, save_state=False,
+                           ignore_watermark=True, order='size')
+            _AV_CACHE.clear()
+            _PH_CACHE.clear()
+            AVATAR_DIR = _art_dir('avatars', refresh=True)
+            PHOTO_DIR = _art_dir('photos', refresh=True)
+        except Exception as e:      # noqa: BLE001
+            try:
+                from astral import gameart as _g
+                _g.log('首屏头像优先提取失败: %r' % e)
+            except Exception:
+                pass
+        finally:
+            try:
+                PRIO_STATE['ready'] = [t for t in tags if (Path(str(AVATAR_DIR)) / (t + '.png')).exists()]
+            except Exception:
+                pass
+            PRIO_STATE.update({'running': False, 'done': True})
+
+    threading.Thread(target=work, daemon=True).start()
+    return len(missing)
+
+
 
 def _pairs(p, idx):
     """task.condition1[idx].params → {角色ID: 场次}。"""
@@ -1421,15 +1482,23 @@ class Api:
         """前端轮询：本机游戏美术资源的补全进度（running/text/i/n/done/found/game）。"""
         return dict(ART_STATE)
 
-    def get_avatars(self):
+    def get_avatars(self, tags=None):
         """角色头像（data URL）：键 = 角色ID 字符串（'102'…），另含 'Start' 兜底。
 
         放在后端做（不走 file://），前端拿到的直接是 data URL —— 见 _avatar_data 的注释。
+        tags：只取这几个角色（首屏轮询用，别每次把 35 张都重新编码一遍）。
         """
         out = {}
         try:
             d = Path(str(AVATAR_DIR))
-            if d.exists():
+            if not d.exists():
+                return out
+            if tags:
+                for t in tags:
+                    u = _avatar_data(str(t))
+                    if u:
+                        out[str(t)] = u
+            else:
                 for f in sorted(d.glob('*.png')):
                     u = _avatar_data(f.stem)
                     if u:
@@ -1437,6 +1506,15 @@ class Api:
         except Exception:
             pass
         return out
+
+    def ensure_avatars(self, tags):
+        """「我的信息」首屏优先：先提取这几个角色的头像（后台线程），提一张算一张。"""
+        n = art_priority_start(tags)
+        return {'ok': True, 'missing': n}
+
+    def avatar_progress(self):
+        """首屏头像提取进度：running / ready（已可用角色）/ done。"""
+        return dict(PRIO_STATE)
 
     # ── 索引 / 回放号 统一解析（复盘查询要用回放号，原「最近对局」用下标）──
     def _resolve_ref(self, ref):
