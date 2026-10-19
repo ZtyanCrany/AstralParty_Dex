@@ -8,6 +8,8 @@
       打包后双击 星趴档案.exe
 """
 import json
+import os
+import platform
 import re
 import time
 import sys
@@ -2556,16 +2558,72 @@ def _clear_zone_marks():
     return n
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# 启动环境自检
+#   GUI 后端是 pywebview → pythonnet → .NET：打包后这一层最容易因为机器环境
+#   （.NET Framework 缺失 / 版本过低、安全软件拦截）直接崩，而 --windowed 没有
+#   控制台可看。所以先自己探一遍：能换后端就换，不行就把细节写进日志并弹一句人话。
+# ═══════════════════════════════════════════════════════════════════════
+_NETFX_RELEASES = ((533320, '4.8.1 或更高'), (528040, '4.8'), (461808, '4.7.2'),
+                   (461308, '4.7.1'), (460798, '4.7'), (394802, '4.6.2'),
+                   (393295, '4.6'), (379893, '4.5.2'), (378758, '4.5.1'),
+                   (378389, '4.5'))
+
+
+def _dotnet_info():
+    """读注册表拿 .NET Framework 版本（pythonnet 在 Windows 上默认就用它）。"""
+    release = 0
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full') as k:
+            release = int(winreg.QueryValueEx(k, 'Release')[0])
+    except Exception:
+        pass
+    label = '未检测到（低于 4.5 或注册表键缺失）'
+    for num, name in _NETFX_RELEASES:
+        if release >= num:
+            label = name
+            break
+    return release, label
+
+
+def _clr_ok():
+    """能否把 .NET 加载起来；成功返回 None，失败返回异常。"""
+    try:
+        import clr  # noqa: F401
+    except Exception as e:          # noqa: BLE001
+        return e
+    return None
+
+
+def _clr_probe(env_extra):
+    """另起进程试加载 CLR（同一进程里失败过的 pythonnet 不会自己恢复）。"""
+    import subprocess
+    env = dict(os.environ)
+    env.update(env_extra)
+    try:
+        r = subprocess.run([sys.executable, '--probe-clr'], env=env,
+                           capture_output=True, timeout=60)
+        return r.returncode == 0, (r.stdout or b'').decode('utf-8', 'replace').strip()
+    except Exception as e:          # noqa: BLE001
+        return False, repr(e)
+
+
 def _startup_failed(err):
     """GUI 后端起不来时给一句人话（打包后没有控制台，只能靠这个对话框）。"""
     import ctypes
+    rel, net_ver = _dotnet_info()
     msg = ('星趴档案启动失败：%s\n\n'
-           '最常见的原因是解压出来的文件带着「从网络下载」的标记，'
-           'Windows 不允许 .NET 加载这类文件。\n'
-           '可以这样处理后重试：\n'
+           '出问题的这一层是「界面后端」：pywebview → pythonnet → .NET。\n'
+           '本机检测到 .NET Framework 4.x：%s\n\n'
+           '请按顺序试：\n'
            '  1) 右键解压出来的文件夹 → 属性 → 勾选「解除锁定」→ 确定；\n'
-           '  2) 或在 PowerShell 里执行：Get-ChildItem -Recurse | Unblock-File\n'
-           '  3) 或删掉解压目录重新解压（用较新的解压工具）。' % err)
+           '     或在 PowerShell 里执行：Get-ChildItem -Recurse | Unblock-File\n'
+           '  2) 没装 .NET Framework 4.8 就去微软官网装（Win10/11 一般自带）；\n'
+           '  3) 杀毒软件可能拦了 _internal/pythonnet/runtime/Python.Runtime.dll，\n'
+           '     把它所在目录加入信任区；\n'
+           '  4) 都不行就把 userdata/log.txt 发给作者。' % (err, net_ver))
     try:
         u32 = ctypes.windll.user32
         u32.MessageBoxW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p,
@@ -2591,11 +2649,52 @@ def main():
         except Exception:
             pass
 
+    # GUI 后端的 .NET 能不能加载，先探一次：能换 CoreCLR 就换，换不了也要
+    # 在日志里留下 .NET 版本，而不是让用户对着 PyInstaller 的 traceback 发呆
+    _rel, _net = _dotnet_info()
+    try:
+        from astral.log import log
+        log('环境：Windows %s ｜ .NET Framework %s（release=%s）'
+            % (platform.version(), _net, _rel))
+    except Exception:
+        pass
+    _clr_err = _clr_ok()
+    if _clr_err is not None:
+        try:
+            from astral.log import log
+            log('CLR 加载失败：%r ｜ .NET Framework %s（release=%s）'
+                % (_clr_err, _net, _rel))
+        except Exception:
+            pass
+        if not os.environ.get('AST_DEX_CLR_RETRY'):
+            _ok, _detail = _clr_probe({'PYTHONNET_RUNTIME': 'coreclr'})
+            if _ok:
+                os.environ['PYTHONNET_RUNTIME'] = 'coreclr'
+                os.environ['AST_DEX_CLR_RETRY'] = '1'
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            try:
+                from astral.log import log
+                log('CoreCLR 兜底同样失败：%s' % _detail)
+            except Exception:
+                pass
+        _startup_failed(_clr_err)
+        raise SystemExit(1)
+
+    if '--probe-clr' in sys.argv:
+        # 给父进程探路用：能不能加载 CLR 直接反映在退出码上
+        _e = _clr_ok()
+        print('clr=ok' if _e is None else 'clr=fail %r' % (_e,))
+        raise SystemExit(0 if _e is None else 1)
+
     if '--selftest' in sys.argv:
         # 打包后排查用（--windowed 没有控制台）：写 userdata/log.txt 后直接退出
         try:
             from astral import gameart
             bad = list(gameart.selftest() or []) + _selftest_helpers()
+            _e = _clr_ok()
+            if _e is not None:
+                bad.append('界面后端 .NET 加载失败：%r（本机 .NET Framework %s）'
+                           % (_e, _dotnet_info()[1]))
             print('selftest 问题:', bad)
         except Exception as e:
             print('selftest 自身失败:', e)
@@ -2643,4 +2742,15 @@ def main():
 if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()     # 打包成 exe 后多进程扫描必需（否则子进程会重启整个程序）
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as _e:          # noqa: BLE001
+        try:
+            from astral.log import log
+            log('未捕获的启动异常：%r' % (_e,))
+        except Exception:
+            pass
+        _startup_failed(_e)
+        raise SystemExit(1)
