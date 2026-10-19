@@ -84,31 +84,43 @@ def _div_block(html, marker):
     return html[open_end + 1:][:20000]
 
 
-def _html_to_text(frag):
-    """把 Release 正文的 HTML 变成纯文本：留空行分节、列表前加 ·，去掉图片。"""
+def _strip_issue_refs(text):
+    """软件里显示 #2 这种 issue 编号没意义，去掉（GitHub 的引用标记）。"""
+    text = re.sub(r'(?<![\w/])#\d+\b', '', text)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+    text = re.sub(r'[ \t]+([，。、；：!？])', r'\1', text)
+    return '\n'.join(line.rstrip() for line in text.splitlines())
+
+
+def _html_to_md(frag):
+    """GitHub 的 Release 正文 HTML → Markdown-lite，交给界面渲染（别把标签/井号原样丢给用户）。"""
     if not frag:
         return ''
     frag = re.sub(r'(?is)<(script|style)\b.*?</\1>', '', frag)
     frag = re.sub(r'(?is)<img\b[^>]*>', '', frag)
+    # 指向 issue / PR 的链接连着文字一起丢掉（后面 _strip_issue_refs 再兜一遍）
+    frag = re.sub(r'(?is)<a\b[^>]*href="[^"]*/(?:issues|pull)/\d+"[^>]*>.*?</a>', '', frag)
+    frag = re.sub(r'(?is)<a\b[^>]*>(.*?)</a>', r'\1', frag)          # 其它链接只留文字
+    frag = re.sub(r'(?is)<(b|strong)\b[^>]*>(.*?)</\1>', r'**\2**', frag)
+    frag = re.sub(r'(?is)<code\b[^>]*>(.*?)</code>', r'`\1`', frag)
+    frag = re.sub(r'(?is)<h([1-6])\b[^>]*>(.*?)</h\1>', r'\n### \2\n', frag)
+    frag = re.sub(r'(?is)<li\b[^>]*>(.*?)</li>', r'\n- \1', frag)
+    frag = re.sub(r'(?is)</?(ul|ol)\b[^>]*>', '\n', frag)
     frag = re.sub(r'(?is)<br\s*/?>', '\n', frag)
-    frag = re.sub(r'(?is)<li\b[^>]*>', '\n· ', frag)
-    frag = re.sub(r'(?is)</(p|div|li|h[1-6]|tr|ul|ol|blockquote)>', '\n', frag)
-    frag = re.sub(r'(?is)<h[1-6]\b[^>]*>', '\n', frag)
-    frag = re.sub(r'(?is)<code\b[^>]*>', ' `', frag)
-    frag = re.sub(r'(?is)</code>', '` ', frag)
+    frag = re.sub(r'(?is)</p>', '\n\n', frag)
     frag = re.sub(r'(?s)<[^>]+>', '', frag)
     frag = html_lib.unescape(frag).replace('\xa0', ' ')
-    out, blank = [], False
+    lines, blank = [], False
     for line in frag.splitlines():
         line = re.sub(r'[ \t]+', ' ', line).strip()
         if not line:
-            if out and not blank:
-                out.append('')
+            if lines and not blank:
+                lines.append('')
             blank = True
             continue
-        out.append(line)
+        lines.append(line)
         blank = False
-    return '\n'.join(out).strip()
+    return _strip_issue_refs('\n'.join(lines).strip())
 
 
 def _notes_from_release_page(tag):
@@ -117,7 +129,7 @@ def _notes_from_release_page(tag):
         html = _get(PAGE_TAG % tag, 10).decode('utf-8', 'replace')
     except Exception:
         return ''
-    return _html_to_text(_div_block(html, 'markdown-body'))[:6000]
+    return _html_to_md(_div_block(html, 'markdown-body'))[:6000]
 
 
 def _notes_from_changelog(tag):
@@ -169,7 +181,7 @@ def fetch_latest():
         assets = d.get('assets') or []
         asset = next((a.get('browser_download_url') for a in assets
                       if str(a.get('name', '')).lower().endswith('.zip')), '')
-        notes = (d.get('body') or '').strip() or _notes_from_release_page(tag) \
+        notes = _strip_issue_refs((d.get('body') or '').strip()) or _notes_from_release_page(tag) \
             or _notes_from_changelog(tag)
         return {'tag': tag, 'url': d.get('html_url') or (PAGE_TAG % tag),
                 'asset': asset, 'notes': notes, 'via': 'api'}
