@@ -27,6 +27,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv314/
 venv/
 
 # 编辑器
