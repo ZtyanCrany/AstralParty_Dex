@@ -2,12 +2,42 @@
 
 **AstralParty_Dex** ｜ English README → [README.en.md](README.en.md)
 
-> 《星引擎 Party》《Astral Party》（国服又名「吉星派对」）
-> 作者：Nemophila & ZytanCrany ｜ 版本 v1.2.1
+> 适用于游戏作品《星引擎 Party》《Astral Party》（国服又名《吉星派对》）<br>
+> 作者：Nemophila & ZytanCrany
 
 一个简洁的自助小工具：登录账号，查看账号信息、皮肤和最近对局战绩，根据uid或回放号查询战局，
-点开任意一局可逐位玩家看**逐轮战况简报与筹码拿取明细**。
+点开任意一局可逐位玩家看**逐轮战况简报、筹码拿取明细和每轮次手牌**。
 所有数据在本地主机处理，游戏本体美术资源通过本机游戏资源获取。
+
+---
+
+## 🚀 快速开始
+
+
+
+### 方式一：源码运行（推荐）
+
+```bash
+git clone https://github.com/ZtyanCrany/AstralParty_Dex.git
+python -m pip install -r requirements.txt
+python main.py
+```
+
+Windows可以直接**双击 `run_source.bat`**。
+
+---
+
+### 方式二：下载免安装版
+
+1. Releases 下载 `AstralParty_Dex_vX.Y.Z_win64.zip`
+2. 解压到任意位置
+3. 双击 `星趴档案.exe`
+4. 在主页面选择任意登录方式，第一次启动会在本机获取美术资源，有暂时的较大占用
+5. 登录成功后会记住登录态，以后打开直接进入档案页
+
+> **运行环境**：Windows 10 / 11 64 位。
+> 界面依赖系统的 **WebView2 Runtime**（Win11 自带；Win10 一般随 Edge 一并安装）。
+> 如果启动后白屏，前往微软官网安装 WebView2 Runtime 即可。
 
 ---
 
@@ -36,7 +66,7 @@
 
 侧边栏的「复盘查询」只有一个输入框，自动识别你要查什么：
 
-- **回放号** —— 打开那一局的完整记录，四位玩家的逐轮战况与筹码明细都能展开
+- **回放号** —— 打开本局的完整记录，四位玩家的逐轮战况与筹码明细等都能展开
 - **玩家UID** —— 列出该玩家最近10局，点任意一局可看复盘信息
 
 ---
@@ -70,30 +100,7 @@
 ![登录页](screenshots/06-login.png)
 
 ---
-## 🚀 快速开始
 
-### 方式一：下载免安装版（推荐）
-
-1. Releases 下载 `AstralParty_Dex_vX.Y.Z_win64.zip`
-2. 解压到任意位置
-3. 双击 `星趴档案.exe`
-4. 第一次会看到登录页 → 填手机号 → 收短信验证码 → 登录
-5. 登录成功后会记住登录态，以后打开直接进入档案页
-
-> **运行环境**：Windows 10 / 11 64 位。
-> 界面依赖系统的 **WebView2 运行时**（Win11 自带；Win10 一般随 Edge 一并安装）。
-> 如果启动后白屏，去微软官网装一下 WebView2 Runtime 即可。
-
-### 方式二：源码运行
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-Windows 上也可以直接**双击 `run_source.bat`**（内部用 `pythonw` 静默启动，不留控制台黑窗口）。
-
----
 
 ## 📁 项目结构
 
@@ -110,7 +117,7 @@ Windows 上也可以直接**双击 `run_source.bat`**（内部用 `pythonw` 静�
 │   ├─ proto_loader.py      从 assets/proto/*.pb 构造 protobuf 消息
 │   ├─ replay.py            回放文件解析（房间快照流 + 协议包记录）
 │   ├─ review.py            复盘构建（逐轮差分、筹码来源判定、三选一链）
-│   └─ gameart.py           ★ 运行时从本机游戏资源包提取头像 / 立绘头像
+│   └─ gameart.py           运行时从本机游戏资源包提取头像 / 立绘头像
 ├─ ui/app.html              前端界面（原生 HTML/CSS/JS，无框架）
 ├─ assets/
 │   ├─ app.ico / app.png    应用图标
@@ -126,7 +133,7 @@ Windows 上也可以直接**双击 `run_source.bat`**（内部用 `pythonw` 静�
 - 所有游戏数据、角色形象、名称的版权归原权利方所有。
 - 请勿用于任何商业用途或大规模数据抓取；因使用本项目产生的任何后果由使用者自行承担。
 - 若官方认为本项目不妥，请联系删除。
-- `astral/signkeys.py` 里是从游戏客户端提取的**渠道签名密钥**（属客户端常量，**不涉及任何用户凭据**）；单独放一个文件，是为了一旦需要，**删除该文件**即可停止分发，而签名算法、协议与界面本身不受影响。
+- `astral/signkeys.py` 是从游戏客户端提取的**渠道签名密钥**（属客户端常量，**不涉及任何用户凭据**）；删除该文件可停止分发。
 
 ---
 
@@ -138,9 +145,8 @@ python tools/build_exe.py       # → dist/星趴档案/星趴档案.exe（连�
 python tools/make_release.py    # → AstralParty_Dex_vX.Y.Z_win64.zip（版本号自动读 main.py 里的 VERSION）
 ```
 
-`make_release.py` 打 zip 前会**删掉产物里的 `userdata/`**（里面是免密登录态，混进去等于把账号一起发出去），
-打完后还会**开包复核**一遍，确认没有 `userdata/` / `token.json` 才放行；
-同时复核**美术资源没有进包**（角色头像 / 立绘改为运行时从本机游戏资源包提取，包里不含）。
+`make_release.py` 打包 zip 前会**删掉产物里的 `userdata/`**，避免账号泄露。<br>
+打包完成后脚本自动**开包复核**一遍，确认没有 `userdata/` / `token.json` 以及美术资源没有进包才放行；<br>
 如果你手动在 `dist/星趴档案/` 里跑过 exe，它会生成 `userdata/`，记得重新打包或手动删掉。
 
 ### 排查（打包后没有控制台，异常不会显示）
@@ -151,10 +157,7 @@ python tools/make_release.py    # → AstralParty_Dex_vX.Y.Z_win64.zip（版本�
 dist\星趴档案\星趴档案.exe --selftest     # 逐项检查依赖导入 / 多进程 / 游戏资源定位 / 试扫 + 解码一张贴图
 ```
 
-自检结果同样写进 `userdata\log.txt`（末尾一行 `问题: [...]`，为空即全部正常）。
-打包时的资源收集有两个已知坑（都已在 `tools/build_exe.py` 里修好，别改回去）：
-`--collect-all UnityPy` 会拖进 torch/pandas 把包撑到 GB 级；而 `archspec` 的 json、
-`fmod_toolkit` 的 `fmod.dll` 这类**叶子依赖的数据文件**不收全，贴图就一张都解不出来。
+自检结果写进 `userdata\log.txt`（末尾一行 `问题: [...]`，为空即全部正常）。
 
 ---
 
@@ -166,4 +169,4 @@ dist\星趴档案\星趴档案.exe --selftest     # 逐项检查依赖导入 / �
 
 ## 💛 致谢
 
-- 数据源：官方客户端与吉星派对Wiki
+- 数据源：官方客户端 吉星派对Wiki
