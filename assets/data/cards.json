@@ -616,7 +616,7 @@
   "name": "疾行菇",
   "type": "build",
   "target": "Entity",
-  "desc": "",
+  "desc": "停留时获得下次移动+3。",
   "mode": "PVE",
   "from": "基础卡牌"
  },
@@ -625,7 +625,7 @@
   "name": "仙品杨桃",
   "type": "build",
   "target": "Entity",
-  "desc": "",
+  "desc": "停留时生命值上限+1。",
   "mode": "PVE",
   "from": "基础卡牌"
  },
@@ -634,7 +634,7 @@
   "name": "芳香蜜桃",
   "type": "build",
   "target": "Entity",
-  "desc": "",
+  "desc": "经过时，恢复角色2点生命值，并解除【嘎呜的关注】",
   "mode": "PVE",
   "from": "基础卡牌"
  },
@@ -643,7 +643,7 @@
   "name": "招财树",
   "type": "build",
   "target": "Entity",
-  "desc": "",
+  "desc": "轮次开始时，5格内的所有角色获得3星币。",
   "mode": "PVE",
   "from": "基础卡牌"
  }

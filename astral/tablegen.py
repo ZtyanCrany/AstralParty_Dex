@@ -100,6 +100,15 @@ def gen_cards(tables, base=None, card_bytes=None):
                 descs.setdefault(head, {})[seq] = v
 
     kinds = card_kinds(card_bytes)
+    # 建筑牌的效果文字不在 STRCard 里：STRBuild 里 <id> 是名字、<id*10+1> 是效果，
+    #   只能用名字把两边对上（Card 表里没有直接指向 Build 的外键）。
+    build_desc = {}
+    sbuild = _int_keys(tables.get('STRBuild'))
+    for k, txt in sbuild.items():
+        if k % 10 == 1 and (k - 1) // 10 in sbuild:
+            nm = str(sbuild[(k - 1) // 10] or '').strip()
+            if nm and txt:
+                build_desc[nm] = clean(txt)
     cards = [dict(c) for c in (base or [])]
     for c in cards:                      # 老表里是 Attack/Defend/... ⇒ 统一小写
         t = str(c.get('type') or '').strip().lower()
@@ -132,6 +141,8 @@ def gen_cards(tables, base=None, card_bytes=None):
             c['desc'] = gdesc
         if cid in kinds:
             c['type'] = kinds[cid]
+        if not (c.get('desc') or '').strip() and c['type'] == 'build':
+            c['desc'] = build_desc.get(str(c.get('name') or '').strip(), '')
     extra = [(cid, byid[cid].get('name')) for cid in sorted(set(byid) - set(names))]
     cards.sort(key=lambda c: int(c['id']))
     return cards, {'names': len(names), 'descs': len(descs), 'renamed': renamed,
