@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 import zipfile
@@ -269,12 +270,55 @@ def can_self_update():
     return True, ''
 
 
+class Cancelled(Exception):
+    """用户点了「取消下载」。"""
+
+
+class Paused(Exception):
+    """用户点了「暂停」——已下载的部分留在磁盘上，续传走 Range。"""
+
+
+_CANCEL = threading.Event()
+_PAUSE = threading.Event()
+
+
+def cancel_download():
+    _PAUSE.clear()
+    _CANCEL.set()
+
+
+def pause_download():
+    _PAUSE.set()
+
+
+def clear_flags():
+    _PAUSE.clear()
+    _CANCEL.clear()
+
+
+def _check_flags():
+    if _CANCEL.is_set():
+        raise Cancelled()
+    if _PAUSE.is_set():
+        raise Paused()
+
+
 def _download_urllib(url, dest, progress=None):
-    req = urllib.request.Request(url, headers={'User-Agent': UA})
-    with urllib.request.urlopen(req, timeout=30) as r, open(dest, 'wb') as f:
-        total = int(r.headers.get('Content-Length') or 0)
-        got = 0
+    """支持断点续传：已有一部分时发 Range 请求接着下（暂停后继续就靠这个）。"""
+    have = dest.stat().st_size if dest.exists() else 0
+    headers = {'User-Agent': UA}
+    if have:
+        headers['Range'] = 'bytes=%d-' % have
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as r, open(dest, 'ab' if have else 'wb') as f:
+        if have and getattr(r, 'status', 200) == 200:      # 服务器不理 Range ⇒ 只能从头来
+            f.seek(0)
+            f.truncate()
+            have = 0
+        total = have + int(r.headers.get('Content-Length') or 0)
+        got = have
         while True:
+            _check_flags()
             chunk = r.read(256 * 1024)
             if not chunk:
                 break
@@ -286,18 +330,28 @@ def _download_urllib(url, dest, progress=None):
 
 
 def _download_curl(url, dest, progress=None):
-    """GitHub 的资源节点在国内常被掐 TLS；curl.exe（Win10+ 自带）重试更强。"""
+    """GitHub 的资源节点在国内常被掐 TLS；curl.exe（Win10+ 自带）重试更强，也支持 -C - 续传。"""
     import shutil
     exe = shutil.which('curl') or r'C:\Windows\System32\curl.exe'
-    p = subprocess.Popen([exe, '-L', '--fail', '--retry', '4', '--retry-delay', '1',
-                          '--connect-timeout', '20', '-A', UA, '-o', str(dest), url],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = [exe, '-L', '--fail', '--retry', '4', '--retry-delay', '1',
+           '--connect-timeout', '20', '-A', UA]
+    if dest.exists() and dest.stat().st_size:
+        cmd += ['-C', '-']
+    cmd += ['-o', str(dest), url]
+    p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     while p.poll() is None:
         if progress:
             try:
                 progress(dest.stat().st_size, 0)
             except OSError:
                 pass
+        if _CANCEL.is_set() or _PAUSE.is_set():
+            p.kill()
+            try:
+                p.wait(timeout=5)       # 不等它退出的话，Windows 上文件还被占着删不掉
+            except Exception:           # noqa: BLE001
+                pass
+            raise Cancelled() if _CANCEL.is_set() else Paused()
         time.sleep(0.4)
     if p.returncode != 0:
         raise RuntimeError('下载失败（curl 退出码 %s）' % p.returncode)
@@ -307,21 +361,47 @@ def _download_curl(url, dest, progress=None):
     return dest
 
 
+def _unlink_retry(path, tries=12):
+    """Windows 上被杀掉的 curl 可能还握着文件句柄，删失败就等一下再试。"""
+    path = Path(path)
+    for _ in range(tries):
+        try:
+            path.unlink()
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            time.sleep(0.25)
+    return not path.exists()
+
+
 def download(url, dest, progress=None):
-    """流式下载到 dest；先走 urllib，失败再用 curl 兜底。progress(已下载, 总字节)。"""
+    """流式下载到 dest；先走 urllib，失败再用 curl 兜底。progress(已下载, 总字节)。
+
+    暂停不会删文件（继续时用 Range 接着下）；取消会删掉半截文件。
+    """
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     last = None
-    for _ in range(2):
-        try:
-            return _download_urllib(url, dest, progress)
-        except Exception as e:          # noqa: BLE001
-            last = e
-            time.sleep(0.5)
     try:
-        return _download_curl(url, dest, progress)
-    except Exception as e:              # noqa: BLE001
-        raise RuntimeError('%s（curl 兜底也失败：%s）' % (last, e))
+        for _ in range(2):
+            _check_flags()
+            try:
+                return _download_urllib(url, dest, progress)
+            except (Cancelled, Paused):
+                raise
+            except Exception as e:      # noqa: BLE001
+                last = e
+                time.sleep(0.5)
+        try:
+            return _download_curl(url, dest, progress)
+        except (Cancelled, Paused):
+            raise
+        except Exception as e:          # noqa: BLE001
+            raise RuntimeError('%s（curl 兜底也失败：%s）' % (last, e))
+    except Cancelled:
+        _unlink_retry(dest)
+        raise
 
 
 def prepare(zip_path):

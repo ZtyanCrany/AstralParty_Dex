@@ -580,6 +580,23 @@
   .upd-st{ font-size:12px; color:#8A8272; min-height:17px; }
   .upd-btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
   .upd-btns button:disabled{ opacity:.5; cursor:default; filter:none; }
+
+  .upd-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .mx{ border:0; background:transparent; color:#A9A08C; font-size:17px; line-height:1;
+       cursor:pointer; padding:0 3px; margin:-3px -5px 0 0; border-radius:6px; }
+  .mx:hover{ background:#EFE9DB; color:#6E6553; }
+  #dlMini{ position:fixed; right:22px; bottom:22px; width:252px; padding:11px 13px;
+           background:#FCFAF6; border:1px solid var(--line); border-radius:11px;
+           box-shadow:0 6px 22px rgba(80,72,52,.16); cursor:pointer; z-index:60; }
+  #dlMini.hide{ display:none; }
+  #dlMini .dlm-row{ display:flex; justify-content:space-between; align-items:baseline;
+                    font-size:11.5px; color:#5C5546; }
+  .dlm-bar{ height:5px; border-radius:3px; background:#EAE4D6; overflow:hidden; margin:7px 0 5px; }
+  .dlm-bar i{ display:block; height:100%; width:0; background:#8FA98A; transition:width .2s; }
+  #dlMini .dlm-row2{ display:flex; gap:10px; font-size:10.5px; color:#9A927F; }
+  #dlMini .dlm-row2 .dlm-act{ margin-left:auto; color:#8A7E66; }
+  #dlMini .dlm-row2 .dlm-act + .dlm-act{ margin-left:0; }
+  .dlm-act:hover{ text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -594,18 +611,26 @@
     </div>
   </div>
 </div>
+<div id="dlMini" class="hide" onclick="openUpdate()">
+  <div class="dlm-row"><b id="dlmTitle">正在下载更新</b><span id="dlmPct">0%</span></div>
+  <div class="dlm-bar"><i id="dlmBar"></i></div>
+  <div class="dlm-row2"><span id="dlmSub"></span>
+    <span class="dlm-act" id="dlmPause" onclick="event.stopPropagation();pauseDownload()">暂停</span>
+    <span class="dlm-act" id="dlmCancel" onclick="event.stopPropagation();cancelDownload()">取消</span>
+  </div>
+</div>
 <div id="upd" class="modal hide" onclick="if(event.target===this)closeUpdate()">
   <div class="mbox" style="width:560px">
-    <div class="mtitle" id="updTitle">检查更新</div>
+    <div class="upd-head"><div class="mtitle" id="updTitle">检查更新</div><button class="mx" onclick="closeUpdate()" title="关闭">✕</button></div>
     <div class="mtext" id="updSub"></div>
     <div class="upd-note" id="updNotes" style="display:none"></div>
     <div class="upd-bar" id="updBar" style="display:none"><i id="updBarIn"></i></div>
     <div class="upd-st" id="updSt"></div>
     <div class="upd-btns">
-      <button class="ghost" onclick="closeUpdate()">关闭</button>
-      <button class="ghost" id="updRecheck" onclick="checkUpdate(true, true)">重新检查</button>
       <button class="ghost" id="updPage" onclick="openReleasePage()">GitHub 页面</button>
-      <button id="updGo" onclick="startUpdate()">一键更新</button>
+      <button class="ghost" id="updPause" onclick="pauseDownload()" style="display:none">暂停</button>
+      <button class="ghost" id="updCancel" onclick="cancelDownload()" style="display:none">取消下载</button>
+      <button id="updGo" onclick="updateAction()">一键更新</button>
     </div>
   </div>
 </div>
@@ -1994,6 +2019,10 @@ window.addEventListener("pywebviewready", () => {
 
 // ══ 检查更新 / 一键更新 ══════════════════════════════════════
 let UPD = null;
+let DL = { state: "idle", done: 0, total: 0, msg: "" };   // 下载状态（后端 update_progress 返回）
+let DL_T = null;                                          // 轮询定时器
+const MB = 1048576;
+const vt = s => (s ? (/^v/i.test(String(s)) ? String(s) : "v" + s) : "");   // 1.2.6 → v1.2.6
 
 async function checkUpdate(force, fromDialog) {
   const st = document.getElementById("updSt");
@@ -2027,51 +2056,157 @@ function mdToHtml(md){
   return out.join("");
 }
 
-function renderUpdate() {
-  const title = document.getElementById("updTitle");
-  const sub = document.getElementById("updSub");
-  const notes = document.getElementById("updNotes");
-  const st = document.getElementById("updSt");
-  const go = document.getElementById("updGo");
-  const bar = document.getElementById("updBar");
-  bar.style.display = "none";
-  go.disabled = true;
-  if (!UPD || !UPD.ok) {
+function dlPct(){ return DL.total ? Math.min(100, Math.round(DL.done * 100 / DL.total)) : 0; }
+
+function dlStatusText(){
+  const pct = dlPct();
+  const size = DL.total
+      ? (DL.done / MB).toFixed(1) + " / " + (DL.total / MB).toFixed(1) + " MB"
+      : (DL.done / MB).toFixed(1) + " MB";
+  if (DL.state === "paused") return "已暂停 · " + (DL.total ? pct + "% · " : "") + size;
+  return "正在下载… " + (DL.total ? pct + "% · " : "") + size;
+}
+
+// 弹窗内容按「检查结果 + 下载状态」渲染
+function renderUpdate(){
+  const el = id => document.getElementById(id);
+  const title = el("updTitle"), sub = el("updSub"), notes = el("updNotes"), st = el("updSt");
+  const bar = el("updBar"), fill = el("updBarIn");
+  const go = el("updGo"), pauseB = el("updPause"), cancelB = el("updCancel");
+  bar.style.display = "none"; fill.style.width = "0%";
+  go.style.display = ""; go.disabled = true; go.textContent = "一键更新";
+  pauseB.style.display = "none"; cancelB.style.display = "none";
+  notes.style.display = "none";
+  const busy = (DL.state === "running" || DL.state === "paused");
+
+  if (!UPD || !UPD.ok){
     title.textContent = "检查更新失败";
-    sub.textContent = UPD && UPD.error
-      ? ("连不上 GitHub：" + UPD.error)
-      : "连不上 GitHub，请稍后再试。";
-    notes.style.display = "none";
+    sub.textContent = (UPD && UPD.error) ? ("连不上 GitHub：" + UPD.error) : "连不上 GitHub，请稍后再试。";
     st.textContent = "也可以点「GitHub 页面」手动下载。";
     return;
   }
-  if (!UPD.newer) {
+  if (!UPD.newer && !busy && DL.state !== "done"){
     title.textContent = "已是最新版本";
-    sub.textContent = "当前 " + UPD.current + " · 远端 " + UPD.tag;
-    notes.style.display = "none";
+    sub.textContent = "当前 " + vt(UPD.current) + " · 远端 " + vt(UPD.tag);
     st.textContent = "";
     return;
   }
-  title.textContent = "发现新版本 " + UPD.tag;
-  sub.textContent = "当前 " + UPD.current + " → 最新 " + UPD.tag;
+
+  title.textContent = "发现新版本 " + vt(UPD.tag);
+  sub.textContent = "当前 " + vt(UPD.current) + " → 最新 " + vt(UPD.tag);
   notes.innerHTML = mdToHtml(UPD.notes || "（这个版本没有写更新说明）");
   notes.style.display = "";
-  if (UPD.canApply) {
-    go.disabled = false;
-    st.textContent = "";
-  } else {
-    st.textContent = UPD.applyHint || "当前环境不支持一键更新，请到 GitHub 页面下载。";
+
+  if (busy){
+    bar.style.display = ""; fill.style.width = dlPct() + "%";
+    go.style.display = "none";
+    pauseB.style.display = ""; pauseB.textContent = (DL.state === "paused") ? "继续" : "暂停";
+    cancelB.style.display = "";
+    st.textContent = dlStatusText();
+    return;
   }
+  if (DL.state === "done"){
+    bar.style.display = ""; fill.style.width = "100%";
+    go.disabled = !UPD.canApply; go.textContent = "立即安装并重启";
+    st.textContent = UPD.canApply ? "更新包已下载好，安装后程序会自动重启。"
+                                  : (UPD.applyHint || "");
+    return;
+  }
+  if (DL.state === "error") st.textContent = "下载失败：" + (DL.msg || "");
+  else if (DL.state === "cancelled") st.textContent = "已取消下载。";
+  else st.textContent = "";
+  if (UPD.canApply) go.disabled = false;
+  else st.textContent = UPD.applyHint || "当前环境不支持一键更新，请到 GitHub 页面下载。";
+}
+
+// 角落迷你进度条：弹窗关掉后仍然能看到 / 能暂停取消
+function syncDownloadUI(){
+  const mini = document.getElementById("dlMini");
+  const modalOpen = !document.getElementById("upd").classList.contains("hide");
+  const show = !modalOpen && (DL.state === "running" || DL.state === "paused" || DL.state === "done");
+  mini.classList.toggle("hide", !show);
+  if (show){
+    const done = DL.state === "done";
+    document.getElementById("dlmTitle").textContent =
+        done ? "更新包已就绪" : (DL.state === "paused" ? "下载已暂停" : "正在下载更新");
+    document.getElementById("dlmPct").textContent = done ? "100%" : dlPct() + "%";
+    document.getElementById("dlmBar").style.width = (done ? 100 : dlPct()) + "%";
+    document.getElementById("dlmSub").textContent = done ? "点击安装并重启" : dlStatusText();
+    document.getElementById("dlmPause").textContent = (DL.state === "paused") ? "继续" : "暂停";
+    document.getElementById("dlmPause").style.display = done ? "none" : "";
+    document.getElementById("dlmCancel").style.display = done ? "none" : "";
+  }
+  if (modalOpen) renderUpdate();
+}
+
+function startPoll(){
+  if (DL_T) return;
+  DL_T = setInterval(async () => {
+    let p = null;
+    try { p = await window.pywebview.api.update_progress(); } catch (e) {}
+    if (!p) return;
+    DL = p;
+    if (DL.state === "running" || DL.state === "paused"){ syncDownloadUI(); return; }
+    clearInterval(DL_T); DL_T = null;
+    syncDownloadUI();
+    // 下载完成时：弹窗开着才自动装；关着就等用户点角落进度条
+    if (DL.state === "done" && !document.getElementById("upd").classList.contains("hide")) applyUpdate();
+  }, 400);
+}
+
+async function startUpdate(){
+  DL = { state: "running", done: 0, total: 0, msg: "" };
+  renderUpdate(); syncDownloadUI();
+  const r = await window.pywebview.api.update_download((UPD && UPD.asset) || "");
+  if (!r || !r.ok){
+    DL = { state: "error", done: 0, total: 0, msg: (r && r.msg) || "" };
+    syncDownloadUI(); return;
+  }
+  startPoll();
+}
+
+async function pauseDownload(){
+  try {
+    if (DL.state === "paused"){
+      await window.pywebview.api.update_resume();
+      DL.state = "running";
+      startPoll();
+    } else {
+      await window.pywebview.api.update_pause();
+      DL.state = "paused";
+    }
+  } catch (e) {}
+  syncDownloadUI();
+}
+
+async function cancelDownload(){
+  try { await window.pywebview.api.update_cancel(); } catch (e) {}
+  if (DL_T){ clearInterval(DL_T); DL_T = null; }
+  DL = { state: "cancelled", done: 0, total: 0, msg: "" };
+  syncDownloadUI();
+}
+
+async function applyUpdate(){
+  const st = document.getElementById("updSt");
+  st.textContent = "正在安装并重启…";
+  const a = await window.pywebview.api.update_apply();
+  if (!a || !a.ok) st.textContent = (a && a.msg) || "安装失败";
+}
+
+function updateAction(){
+  if (DL.state === "done") applyUpdate(); else startUpdate();
 }
 
 function openUpdate() {
   document.getElementById("upd").classList.remove("hide");
   renderUpdate();
+  syncDownloadUI();
   checkUpdate(false, true);
 }
 
 function closeUpdate() {
   document.getElementById("upd").classList.add("hide");
+  syncDownloadUI();          // 正在下载 → 角落出现进度条
 }
 
 function openReleasePage() {
@@ -2079,47 +2214,6 @@ function openReleasePage() {
   window.pywebview.api.open_url(u);
 }
 
-async function startUpdate() {
-  const go = document.getElementById("updGo");
-  const st = document.getElementById("updSt");
-  const bar = document.getElementById("updBar");
-  const fill = document.getElementById("updBarIn");
-  go.disabled = true;
-  bar.style.display = "";
-  fill.style.width = "0%";
-  st.textContent = "正在下载…";
-  const r = await window.pywebview.api.update_download((UPD && UPD.asset) || "");
-  if (!r || !r.ok) {
-    st.textContent = (r && r.msg) || "下载失败";
-    go.disabled = false;
-    return;
-  }
-  const timer = setInterval(async () => {
-    let p = {};
-    try { p = await window.pywebview.api.update_progress(); } catch (e) {}
-    if (p && p.state === "running") {
-      const pct = p.total ? Math.min(100, Math.round(p.done * 100 / p.total)) : 0;
-      fill.style.width = pct + "%";
-      st.textContent = p.total
-        ? "正在下载… " + pct + "%（" + (p.done / 1048576).toFixed(1) + " / " + (p.total / 1048576).toFixed(1) + " MB）"
-        : "正在下载… " + (p.done / 1048576).toFixed(1) + " MB";
-      return;
-    }
-    clearInterval(timer);
-    if (p && p.state === "error") {
-      st.textContent = "下载失败：" + (p.msg || "");
-      go.disabled = false;
-      return;
-    }
-    fill.style.width = "100%";
-    st.textContent = "下载完成，正在安装并重启…";
-    const a = await window.pywebview.api.update_apply();
-    if (!a || !a.ok) {
-      st.textContent = (a && a.msg) || "安装失败";
-      go.disabled = false;
-    }
-  }, 350);
-}
 </script>
 </body>
 </html>

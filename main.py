@@ -1224,27 +1224,69 @@ class Api:
     def update_download(self, url=''):
         """后台线程下载更新包；进度用 update_progress() 轮询。"""
         from astral import update as U
-        if self._upd.get('state') == 'running':
-            return {'ok': False, 'msg': '正在下载中…'}
+        if self._upd.get('state') in ('running', 'paused'):
+            return {'ok': False, 'msg': '已经在下载了'}
         info = U.check(VERSION)
         url = url or info.get('asset') or ''
         if not url:
             return {'ok': False, 'msg': '没拿到下载地址，请到 GitHub 页面手动下载'}
         dest = Path(paths.DATA_DIR) / '_update.zip'
-        self._upd = {'state': 'running', 'done': 0, 'total': 0, 'msg': ''}
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+        U.clear_flags()
+        self._upd = {'state': 'running', 'done': 0, 'total': 0, 'msg': '',
+                     'url': url, 'path': str(dest)}
+        self._spawn_download(U, url, dest)
+        return {'ok': True}
 
+    def _spawn_download(self, U, url, dest):
         def work():
             try:
                 U.download(url, dest, progress=self._upd_tick)
-                self._upd.update(state='done', path=str(dest), msg='')
+                self._upd.update(state='done', msg='')
+            except U.Paused:
+                self._upd.update(state='paused')
+            except U.Cancelled:
+                self._upd.update(state='cancelled', msg='已取消')
             except Exception as e:      # noqa: BLE001
                 self._upd.update(state='error', msg='%s' % e)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def update_pause(self):
+        from astral import update as U
+        if self._upd.get('state') != 'running':
+            return {'ok': False, 'msg': '当前不在下载中'}
+        U.pause_download()
+        return {'ok': True}
+
+    def update_resume(self):
+        """续传：已下载的部分留着，用 Range 请求接着下。"""
+        from astral import update as U
+        if self._upd.get('state') != 'paused':
+            return {'ok': False, 'msg': '当前不是暂停状态'}
+        url = self._upd.get('url') or ''
+        dest = Path(self._upd.get('path') or (Path(paths.DATA_DIR) / '_update.zip'))
+        if not url:
+            return {'ok': False, 'msg': '没有下载地址'}
+        U.clear_flags()
+        self._upd['state'] = 'running'
+        self._spawn_download(U, url, dest)
+        return {'ok': True}
+
+    def update_cancel(self):
+        from astral import update as U
+        U.cancel_download()
+        U._unlink_retry(Path(paths.DATA_DIR) / '_update.zip')
+        self._upd.update(state='cancelled', msg='已取消')
         return {'ok': True}
 
     def _upd_tick(self, done, total):
-        self._upd['done'], self._upd['total'] = done, total
+        self._upd['done'] = done
+        if total:
+            self._upd['total'] = total
 
     def update_progress(self):
         return dict(self._upd)
@@ -1265,7 +1307,7 @@ class Api:
 
         def bye():
             time.sleep(0.9)
-            os._exit(0)                 # 让 .bat 接手覆盖；别走退出流程拖时间
+            os._exit(0)                 # 让覆盖脚本接手；别走退出流程拖时间
 
         threading.Timer(0.2, bye).start()
         return {'ok': True}

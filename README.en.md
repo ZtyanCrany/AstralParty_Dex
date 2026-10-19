@@ -52,7 +52,7 @@ On Windows you can also simply **double-click `run_source.bat`**.
 | **Recent matches** | The latest 10 matches; expand one for all four players' stats, click a player name for their per-round summary and chip pickups |
 | **Replay lookup** | A **replay id** or a **player UID**: a replay id opens that one match, a UID lists that player's latest 10 matches |
 | **Profile export** | One-click Markdown archive (character usage ranking + match details); copy it or save it to a file |
-| **Update check** | A `NEW` badge appears next to the version when a release is out; the dialog shows what changed, links to the release page, or downloads and installs the update in place and restarts |
+| **Update check** | A `NEW` badge appears next to the version when a release is out; the dialog shows what changed, links to the release page, or downloads and installs the update in place and restarts. Downloads can be paused, resumed or cancelled, and a corner progress card stays visible after the dialog is closed |
 
 ### 🎲 Match breakdown (added in v1.1.0, difficulty and level in v1.2.0)
 
