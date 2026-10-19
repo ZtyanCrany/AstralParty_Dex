@@ -186,6 +186,10 @@
         padding:18px 20px; margin-bottom:18px; }
   .box h3{ font-size:14px; margin-bottom:14px; font-weight:600; }
   table{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+  /* 我的信息这类页面里的表头：滚动到该表时钉在 #main 顶部 */
+  .box table thead th{ position:sticky; top:0; z-index:3; background:var(--card);
+                       transition:box-shadow .18s; }
+  .box table.stuck thead th{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   th{ text-align:left; color:var(--dim); font-weight:500; font-size:11.5px;
       padding:0 10px 9px 0; border-bottom:1px solid var(--line); }
   td{ padding:8px 10px 8px 0; border-bottom:1px solid #F2EFE7; vertical-align:middle; }
@@ -334,6 +338,9 @@
                padding:2px 8px; border-radius:7px; }
   .rvhead .rx:hover{ background:#EDE7DA; color:var(--ink); }
   .rvbody{ padding:0 20px 20px; overflow-y:auto; }
+  /* 对局统计 ⇄ 手牌 切换：淡入 + 轻微上移，别硬切 */
+  @keyframes rvIn{ from{ opacity:.2; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+  .rvbody.rvanim{ animation:rvIn .17s cubic-bezier(.2,.7,.3,1) both; }
   /* 顶部留白：内容区自身不留，改由第一个小节承担，
      这样黏性行才能一直贴住内容区顶部（不会露出滑过去的卡牌）。
      手牌视图的留白交给黏性行自己的内边距，保证「钉住」与「未钉住」上下一致 */
@@ -342,8 +349,16 @@
   .rvbody>.rvsec:first-child:has(.htab){ margin-top:0; }
   .rvbody>.rvsec:first-child:has(.htab)>h4:first-child{ padding-top:8px; }
   .rvsec{ margin-bottom:17px; }
+  /* 小节标题吸顶；下面的表头 / 轮次标题按它的高度往下让 */
   .rvsec>h4{ font-size:13px; color:#4E4739; font-weight:700; letter-spacing:0;
-             margin:0 0 9px; padding-left:9px; border-left:3px solid #C6A15B; }
+             margin:0 0 9px; padding:6px 0 6px 9px; border-left:3px solid #C6A15B;
+             position:sticky; top:0; z-index:4; background:#FCFAF6;
+             transition:box-shadow .18s; }
+  .rvsec>h4.stuck{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
+  /* 逐轮明细里的「第 n 轮」：钉在小节标题下面 */
+  .rd>h5{ position:sticky; top:var(--rvh, 34px); z-index:3; background:#FCFAF6;
+          padding:5px 0; transition:box-shadow .18s; }
+  .rd>h5.stuck{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   /* ★ 内容跟标题文字对齐：标题文字左缘 = 3px 竖条 + 9px 内距 = 12px */
   .rvsec>*:not(h4){ margin-left:12px; }
   .rvsec .rtab{ width:calc(100% - 12px); }
@@ -392,7 +407,7 @@
   /* 玩家页签（表头）：向下滚动时钉在弹窗顶部。
      自带 8px 上内边距，钉住时不贴死、未钉住时不多占，两种状态观感一致。 */
   .htab thead th{ border-bottom:1px solid var(--line);
-                  padding:8px 0 6px; position:sticky; top:0; z-index:3;
+                  padding:8px 0 6px; position:sticky; top:var(--rvh, 34px); z-index:3;
                   background:#FCFAF6; transition:box-shadow .18s; }
   /* 挂上 .stuck 才浮阴影：只在表头真钉住时提示「已吸顶」 */
   .htab.stuck thead th{ box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
@@ -851,10 +866,23 @@ function scrollParent(el){
   }
   return document.scrollingElement;
 }
+function stuckNow(el, box){
+  // sticky 是相对滚动容器的 padding box 定位的，所以要把容器的上内边距算进来
+  const want = parseFloat(getComputedStyle(el).top) || 0;
+  const pad = parseFloat(getComputedStyle(box).paddingTop) || 0;
+  const d = el.getBoundingClientRect().top - box.getBoundingClientRect().top - pad - want;
+  return d > -1 && d < 1.5;      // 贴在那条线上才算钉住（滚出去了不算）
+}
 document.addEventListener('scroll', ()=>{
-  document.querySelectorAll('.htab').forEach(t=>{
+  document.querySelectorAll('.htab, .box table').forEach(t=>{
     const box = scrollParent(t);
-    t.classList.toggle('stuck', !!box && box.scrollTop > 2);
+    const head = t.querySelector('thead th') || t;
+    t.classList.toggle('stuck', !!box && box.scrollTop > 2 && stuckNow(head, box));
+  });
+  // 复盘弹窗里的小节标题 / 第 n 轮：只在真钉住时浮阴影
+  document.querySelectorAll('.rvbody .rvsec>h4, .rvbody .rd>h5').forEach(h=>{
+    const box = scrollParent(h);
+    h.classList.toggle('stuck', !!box && box.scrollTop > 2 && stuckNow(h, box));
   });
 }, true);
 function say(t, cls){ const m=$('#msg'); m.textContent=t; m.className=cls||''; }
@@ -1706,6 +1734,13 @@ function render(d){
     }
     const b = document.getElementById('rvBody');
     b.innerHTML = html;
+    // 吸顶标题的实际高度喂给下面的表头 / 第 n 轮，让它们正好贴着标题下沿
+    const h4 = b.querySelector('.rvsec>h4');
+    if(b.style && b.style.setProperty)          // 静态检查用的假 DOM 没有 setProperty
+      b.style.setProperty('--rvh', (h4 ? h4.offsetHeight : 0) + 'px');
+    b.classList.remove('rvanim');
+    void b.offsetWidth;                 // 强制重排，动画才会从头播
+    b.classList.add('rvanim');
     b.scrollTop = 0;   // 切页签 / 切视图都回到顶部，别停在上一处滚动位置
   };
   window.rvTab = (t) => { window.__rvState.tab = t; window.__rvState.detail = null; window.drawRv(); };
