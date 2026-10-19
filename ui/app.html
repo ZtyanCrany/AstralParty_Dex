@@ -557,9 +557,11 @@
   .tag.off{ background:transparent; color:#BDB6A4; border:1px dashed #D9D2C2; }
 
   /* ── 版本徽标 + 更新弹窗 ── */
-  #verTag{ cursor:pointer; user-select:none; }
+  #who #verTag{ display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+                user-select:none; white-space:nowrap; }
   #verTag:hover{ color:#8A7E66; }
-  .newdot{ display:inline-block; margin-left:5px; padding:1px 5px; border-radius:7px;
+  #verTag #verNum{ display:inline; margin:0; font-weight:400; color:inherit; }
+  .newdot{ display:inline-block; flex:0 0 auto; margin-left:0; padding:1px 5px; border-radius:7px;
            background:#D8552F; color:#fff; font-size:9px; font-style:normal;
            letter-spacing:.4px; vertical-align:1px; }
   .upd-note{ max-height:44vh; overflow:auto; white-space:pre-wrap; font-size:12.5px;

@@ -7,8 +7,11 @@
   · Release 的 zip 名带 v（AstralParty_Dex_v1.2.6_win64.zip），tag 却可能是 1.2.6，
     两种写法都要能拼出来。
   · 更新包解压后整目录覆盖，但 **userdata/ 必须保留**（里面有免密登录态）。
-  · exe 不能覆盖自己：写一个 .bat，等本进程退出后 robocopy 过去再重启。
+  · exe 不能覆盖自己：等本进程退出后 robocopy 过去再重启。
+    覆盖脚本用 powershell -EncodedCommand 而不是 .bat —— 路径含中文时
+    cmd 按本地代码页解析脚本会乱码，robocopy 静默失败（实测）。
 """
+import html as html_lib
 import json
 import os
 import re
@@ -28,6 +31,7 @@ EXPANDED = 'https://github.com/%s/%s/releases/expanded_assets/%s' % (OWNER, REPO
 CHANGELOG_RAW = 'https://raw.githubusercontent.com/%s/%s/main/CHANGELOG.md' % (OWNER, REPO)
 UA = 'AstralParty_Dex-updater'
 CHECK_TTL = 6 * 3600          # 检查结果缓存 6 小时，别每次开都打 GitHub
+CACHE_VER = 2                 # 更新说明改用 Release 正文后，旧缓存作废重查
 _VER_RE = re.compile(r'[vV]?(\d+)\.(\d+)\.(\d+)')
 
 
@@ -56,6 +60,64 @@ def _get(url, timeout=10, headers=None):
             if i == 0:
                 time.sleep(0.6)
     raise last
+
+
+def _div_block(html, marker):
+    """截出带 marker（如 markdown-body）的那个 <div> 的完整内容，按嵌套配平。"""
+    i = html.find(marker)
+    if i < 0:
+        return ''
+    start = html.rfind('<div', 0, i)
+    if start < 0:
+        return ''
+    open_end = html.find('>', start)
+    if open_end < 0:
+        return ''
+    depth = 0
+    for m in re.finditer(r'<div\b|</div>', html[start:]):
+        if m.group(0) == '<div':
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0:
+                return html[open_end + 1:start + m.start()]
+    return html[open_end + 1:][:20000]
+
+
+def _html_to_text(frag):
+    """把 Release 正文的 HTML 变成纯文本：留空行分节、列表前加 ·，去掉图片。"""
+    if not frag:
+        return ''
+    frag = re.sub(r'(?is)<(script|style)\b.*?</\1>', '', frag)
+    frag = re.sub(r'(?is)<img\b[^>]*>', '', frag)
+    frag = re.sub(r'(?is)<br\s*/?>', '\n', frag)
+    frag = re.sub(r'(?is)<li\b[^>]*>', '\n· ', frag)
+    frag = re.sub(r'(?is)</(p|div|li|h[1-6]|tr|ul|ol|blockquote)>', '\n', frag)
+    frag = re.sub(r'(?is)<h[1-6]\b[^>]*>', '\n', frag)
+    frag = re.sub(r'(?is)<code\b[^>]*>', ' `', frag)
+    frag = re.sub(r'(?is)</code>', '` ', frag)
+    frag = re.sub(r'(?s)<[^>]+>', '', frag)
+    frag = html_lib.unescape(frag).replace('\xa0', ' ')
+    out, blank = [], False
+    for line in frag.splitlines():
+        line = re.sub(r'[ \t]+', ' ', line).strip()
+        if not line:
+            if out and not blank:
+                out.append('')
+            blank = True
+            continue
+        out.append(line)
+        blank = False
+    return '\n'.join(out).strip()
+
+
+def _notes_from_release_page(tag):
+    """Release 正文（作者在 GitHub 上写的那份）——更新说明就用它，别自己改口径。"""
+    try:
+        html = _get(PAGE_TAG % tag, 10).decode('utf-8', 'replace')
+    except Exception:
+        return ''
+    return _html_to_text(_div_block(html, 'markdown-body'))[:6000]
 
 
 def _notes_from_changelog(tag):
@@ -107,8 +169,10 @@ def fetch_latest():
         assets = d.get('assets') or []
         asset = next((a.get('browser_download_url') for a in assets
                       if str(a.get('name', '')).lower().endswith('.zip')), '')
+        notes = (d.get('body') or '').strip() or _notes_from_release_page(tag) \
+            or _notes_from_changelog(tag)
         return {'tag': tag, 'url': d.get('html_url') or (PAGE_TAG % tag),
-                'asset': asset, 'notes': d.get('body') or '', 'via': 'api'}
+                'asset': asset, 'notes': notes, 'via': 'api'}
     except Exception:
         pass
 
@@ -127,7 +191,8 @@ def fetch_latest():
                 'error': '没从 Release 页解析出版本号'}
     return {'tag': tag, 'url': PAGE_TAG % tag,
             'asset': _asset_from_expanded(tag) or _asset_guess(tag),
-            'notes': _notes_from_changelog(tag), 'via': 'web'}
+            'notes': _notes_from_release_page(tag) or _notes_from_changelog(tag),
+            'via': 'web'}
 
 
 # ── 缓存 ───────────────────────────────────────────────────────
@@ -147,13 +212,14 @@ def check(current, force=False):
         try:
             d = json.loads(f.read_text('utf-8'))
             ts = float(d.pop('ts', 0) or 0)
-            if time.time() - ts < CHECK_TTL:
+            if time.time() - ts < CHECK_TTL and d.get('cv') == CACHE_VER:
                 info = d
         except Exception:
             info = None
     if info is None:
         info = fetch_latest()
         info['ts'] = time.time()
+        info['cv'] = CACHE_VER
         try:
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_text(json.dumps(info, ensure_ascii=False), 'utf-8')
