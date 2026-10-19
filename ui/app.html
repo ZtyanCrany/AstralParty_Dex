@@ -411,9 +411,16 @@
   .htab td .hc:last-child{ margin-bottom:0; }
   .hc.dashed{ background:#FBF8F2; border-style:dashed; border-color:#CFC6B2; color:#8A8377; }
   .hc.used{ background:#F4F1EA; border-color:#E4DDCC; color:#A79F91; text-decoration:line-through; }
-  .hc.t-Attack{ background:#FBEFE7; border-color:#F0D9C8; color:#A9542C; }
-  .hc.t-Defend{ background:#EAF0F7; border-color:#D6E1EE; color:#44638C; }
-  .hc.t-Effect{ background:#E9F4EA; border-color:#D3E7D6; color:#3D7A50; }
+  /* 卡牌类型配色：取自游戏里卡牌左上角那个小徽标（咒=青绿 #00D0A0，建=粉 #F880A0） */
+  .hc.t-attack{ background:#FBEFE7; border-color:#F0D9C8; color:#A9542C; }
+  .hc.t-defend{ background:#EAF0F7; border-color:#D6E1EE; color:#44638C; }
+  .hc.t-effect{ background:#E9F4EA; border-color:#D3E7D6; color:#3D7A50; }
+  .ct{ display:inline-block; width:14px; height:14px; line-height:14px; border-radius:4px;
+       margin-right:4px; font-size:10px; font-weight:600; text-align:center; color:#fff;
+       vertical-align:1px; }
+  .hc.t-attack .ct{ background:#D9754A; }
+  .hc.t-defend .ct{ background:#4A6FA5; }
+  .hc.t-effect .ct{ background:#4E8A5F; }
   .hgrp{ margin-bottom:7px; }
   .hgrp:last-child{ margin-bottom:0; }
   .hlab{ display:block; font-size:10.5px; color:#B0A995; margin-bottom:3px;
@@ -423,8 +430,12 @@
           position:sticky; top:0; z-index:3; background:#FCFAF6;
           padding:8px 0 7px; box-shadow:0 7px 9px -9px rgba(90,80,60,.45); }
   .rvtit .hav{ width:22px; height:22px; border-radius:50%; object-fit:contain; }
-  .hc.t-Counter{ background:#EDF5F1; border-color:#D8E9E1; color:#3F7A65; }
-  .hc.t-curse{ background:#F6EDEC; border-color:#EAD8D5; color:#96574F; }
+  .hc.t-counter{ background:#EDF5F1; border-color:#D8E9E1; color:#3F7A65; }
+  .hc.t-counter .ct{ background:#3F8A72; }
+  .hc.t-curse{ background:#E4FBF5; border-color:#B4EEDD; color:#0B7A63; }
+  .hc.t-curse .ct{ background:#00C79A; }
+  .hc.t-build{ background:#FDEDF2; border-color:#F6C9D6; color:#A63A5C; }
+  .hc.t-build .ct{ background:#F880A0; }
   .crow{ display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
   .crow .rf{ font-size:11px; font-weight:600; flex:0 0 auto; min-width:30px;
              white-space:nowrap; }
@@ -1713,6 +1724,15 @@ function render(d){
   // A：每轮手牌总览（行 = 轮次，列 = 玩家，每格：开局 / 获得 / 使用）
     // A：每轮总览（行 = 轮次，列 = 玩家；每格三组：开局 / 获得 / 使用）
   //    ★ 牌「怎么来的」（商店/谁发的卡）回放里没有可靠记录 ⇒ 一律不标来源，只列牌。
+  // 卡牌类型 → 徽标字（与游戏卡面左上角一致）
+  const CARD_TAG = {attack:'攻', defend:'防', effect:'效', counter:'反', curse:'咒', build:'建'};
+  window.cardChip = (c, extra) => {
+    const t = String((c && c.type) || '').toLowerCase();
+    const tg = CARD_TAG[t];
+    return '<span class="hc t-' + window.__esc(t || 'x') + (extra ? ' ' + extra : '') + '">' +
+           (tg ? '<i class="ct">' + tg + '</i>' : '') + window.__esc(c.name) + '</span>';
+  };
+
   window.handMatrix = (rv) => {
     const esc = window.__esc;
     const ps = rv.players || [];
@@ -1722,7 +1742,7 @@ function render(d){
              '<div class="rvfoot">这局回放没解析到手牌数据</div></div>';
     const grp = (label, cs) => (!cs || !cs.length) ? '' :
       '<div class="hgrp"><span class="hlab">' + label + '</span>' +
-      cs.map(c => '<span class="hc t-' + esc(c.type || 'x') + '">' + esc(c.name) + '</span>').join('') +
+      cs.map(c => window.cardChip(c)).join('') +
       '</div>';
     let head = '<tr><th class="hrt">轮次</th>';
     ps.forEach(p => {
@@ -1759,8 +1779,7 @@ function render(d){
     // label 与卡牌同一行（不换行）；获得用虚线框、使用用划掉线
     const row = (label, cls, cs, extra) => (!cs || !cs.length) ? '' :
       '<div class="crow"><span class="' + cls + '">' + label + '</span>' +
-      cs.map(c => '<span class="hc t-' + esc(c.type || 'x') + (extra ? ' ' + extra : '') + '">' +
-                  esc(c.name) + '</span>').join('') +
+      cs.map(c => window.cardChip(c, extra)).join('') +
       '</div>';
     let out = '<div class="rvsec"><h4 class="rvtit">' +
       '<a class="rvbk" onclick="rvBack()">\u2039 每轮手牌</a>' +

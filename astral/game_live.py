@@ -30,6 +30,9 @@ FALLBACK_MARKERS = [b'UT_Relic_', b'UT_Skin_', '轨道炮'.encode('utf-8')]
 # 扫描包的大小上限：先用小上限快速扫，扫不到再放大重扫
 SCAN_CAPS = (8 * 1024 * 1024, 128 * 1024 * 1024)
 
+# 生成逻辑变更时 +1：老用户手上的表会被判为过期，自动重抽一次
+SCHEMA = 2
+
 LIVE_SUBDIR = 'game_live'
 SCAN_CACHE = '_scan.json'
 STAMP = '_stamp.json'
@@ -373,7 +376,7 @@ def current_stamp():
     if root is None:
         return {}
     return {'version': version_text(ver), 'root': str(root),
-            'freshness': int(bundle_freshness(root))}
+            'freshness': int(bundle_freshness(root)), 'schema': SCHEMA}
 
 
 def is_stale():
@@ -383,7 +386,8 @@ def is_stale():
         return False                     # 本机没装游戏 / 找不到包 ⇒ 不动
     old = read_stamp()
     return (old.get('version') != cur.get('version')
-            or old.get('freshness') != cur.get('freshness'))
+            or old.get('freshness') != cur.get('freshness')
+            or old.get('schema') != cur.get('schema'))
 
 
 def _gen_char_ids(tables, wiki, base):
@@ -416,7 +420,7 @@ def refresh(bundled_dir=None, force=False, log=None):
         return None
     root = Path(cur['root'])
     t0 = time.time()
-    bundles, tables, raws = load_game_tables(root, log=log, raw_names=('Character',))
+    bundles, tables, raws = load_game_tables(root, log=log, raw_names=('Character', 'Card'))
     if not bundles:
         _log('没找到配置包：%s' % root, log)
         return None
@@ -453,7 +457,8 @@ def refresh(bundled_dir=None, force=False, log=None):
 
     wiki = load_base('skins.json', {})
     jobs = [
-        ('cards.json', lambda: tablegen.gen_cards(tables, load_base('cards.json', []))[0]),
+        ('cards.json', lambda: tablegen.gen_cards(tables, load_base('cards.json', []),
+                                                  raws.get('Card'))[0]),
         ('chips.json', lambda: tablegen.gen_chips(tables, load_base('chips.json', []))[0]),
         ('buffs.json', lambda: tablegen.gen_buffs(tables)[0]),
         ('monsters.json', lambda: tablegen.gen_monsters(tables)[0]),

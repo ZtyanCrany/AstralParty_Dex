@@ -60,7 +60,34 @@ def _int_keys(table):
 
 
 # ── 卡牌 ────────────────────────────────────────────────────────
-def gen_cards(tables, base=None):
+
+# Card 配置表（TextAsset 'Card'）的 field 9 就是卡牌的「大类」，也就是游戏里左上角那个
+#   小徽标：攻/防/效/反/咒/建。STRCard 里只有名字和效果文字，类型只在这里。
+#   实测：10001 攻击=1、10002 防御=2、20003 保护屏障(反击)=4、
+#         21025 罪证嫌疑(诅咒)=8、21026 疾行菇 / 21027 仙品杨桃(建筑)=9。
+CARD_KIND = {1: 'attack', 2: 'defend', 3: 'effect', 4: 'counter', 8: 'curse', 9: 'build'}
+
+# 老数据里的写法（大写 / 历史拼法）统一成小写，前端按一份表上色
+_CARD_TYPE_NORM = {'attack': 'attack', 'defend': 'defend', 'effect': 'effect',
+                   'counter': 'counter', 'curse': 'curse', 'build': 'build'}
+
+
+def card_kinds(card_bytes):
+    """从 Card 表解出 {卡号: 类型}；拿不到就返回空 dict（退化成老做法，不报错）。"""
+    out = {}
+    if not card_bytes:
+        return out
+    for cid, body in _pb_records(card_bytes).items():
+        for f, wt, v in _pb_fields(body):
+            if f == 9 and wt == 0:
+                kind = CARD_KIND.get(v)
+                if kind:
+                    out[cid] = kind
+                break
+    return out
+
+
+def gen_cards(tables, base=None, card_bytes=None):
     """STRCard：键=卡号→牌名；键=卡号*10+序号→效果文字（取序号 1）。"""
     scard = _int_keys(tables.get('STRCard'))
     names, descs = {}, {}
@@ -72,7 +99,12 @@ def gen_cards(tables, base=None):
             if CARD_LO <= head <= CARD_HI:
                 descs.setdefault(head, {})[seq] = v
 
+    kinds = card_kinds(card_bytes)
     cards = [dict(c) for c in (base or [])]
+    for c in cards:                      # 老表里是 Attack/Defend/... ⇒ 统一小写
+        t = str(c.get('type') or '').strip().lower()
+        if t in _CARD_TYPE_NORM:
+            c['type'] = t
     byid = {}
     for c in cards:
         try:
@@ -86,7 +118,7 @@ def gen_cards(tables, base=None):
         gdesc = clean(descs[cid][1]) if descs.get(cid, {}).get(1) else ''
         c = byid.get(cid)
         if c is None:
-            row = {'id': cid, 'name': gname, 'type': 'Effect', 'target': 'Entity',
+            row = {'id': cid, 'name': gname, 'type': kinds.get(cid, 'effect'), 'target': 'Entity',
                    'desc': gdesc, 'mode': series_mode(cid), 'from': '基础卡牌'}
             cards.append(row)
             byid[cid] = row
@@ -98,10 +130,13 @@ def gen_cards(tables, base=None):
         if gdesc and c.get('desc') != gdesc:
             retexted.append((cid, gname, c.get('desc', ''), gdesc))
             c['desc'] = gdesc
+        if cid in kinds:
+            c['type'] = kinds[cid]
     extra = [(cid, byid[cid].get('name')) for cid in sorted(set(byid) - set(names))]
     cards.sort(key=lambda c: int(c['id']))
     return cards, {'names': len(names), 'descs': len(descs), 'renamed': renamed,
-                   'retexted': retexted, 'added': added, 'extra': extra}
+                   'retexted': retexted, 'added': added, 'extra': extra,
+                   'kinds': len(kinds)}
 
 
 # ── 筹码 ────────────────────────────────────────────────────────

@@ -430,7 +430,8 @@ def card_info(cid):
     c = card_table().get(int(cid))
     if not c:
         return {'id': int(cid), 'name': '卡牌 %d' % cid, 'type': '', 'desc': ''}
-    return {'id': int(cid), 'name': c['name'], 'type': c.get('type', ''),
+    return {'id': int(cid), 'name': c['name'],
+            'type': str(c.get('type') or '').strip().lower(),
             'desc': c.get('desc', '')}
 
 
