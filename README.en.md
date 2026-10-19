@@ -2,13 +2,43 @@
 
 **星趴档案** ｜ 中文 README → [README.md](README.md)
 
-> 《Astral Party》(CN server「吉星派对」)
-> Authors: **Nemophila & ZtyanCrany** ｜ Version **v1.2.1**
+> For 《星引擎 Party》/《Astral Party》 (the CN server is titled 《吉星派对》)<br>
+> Authors: **Nemophila & ZtyanCrany**
 
-A tidy self-service tool: log in with your own account, then browse your profile, skin collection
-and recent matches, or look up a match by replay id / a player by UID — click any match to see each
-player's **round-by-round summary and relic pickups**.
-**All data is processed on your own machine**; game artwork is read from the locally installed game.
+A small self-service tool: log in with your own account to browse your profile, skins and recent
+matches, look a match up by replay id or a player by UID, then open any match to see **each
+player's round-by-round summary, relic pickups and per-round hand cards**.
+Everything is processed on your own machine; game artwork is read from the copy of the game
+installed locally.
+
+---
+
+## 🚀 Quick start
+
+### Option A — from source (recommended)
+
+```bash
+git clone https://github.com/ZtyanCrany/AstralParty_Dex.git
+python -m pip install -r requirements.txt
+python main.py
+```
+
+On Windows you can also simply **double-click `run_source.bat`**.
+
+---
+
+### Option B — prebuilt, no installation
+
+1. Download `AstralParty_Dex_vX.Y.Z_win64.zip` from **Releases**
+2. Extract it anywhere
+3. Run `星趴档案.exe`
+4. Pick any login method on the start page. The first launch extracts artwork from the local game,
+   so it briefly uses a fair amount of disk
+5. Your session is remembered, so later launches go straight to your profile
+
+> **Requirements**: Windows 10 / 11 64-bit.
+> The UI needs the system **WebView2 Runtime** (bundled with Win11; on Win10 it usually comes with Edge).
+> If the window stays blank, install the WebView2 Runtime from Microsoft.
 
 ---
 
@@ -16,27 +46,29 @@ player's **round-by-round summary and relic pickups**.
 
 | Page | What you get |
 | --- | --- |
-| **Login (登录页面)** | SMS-code login; the session can be remembered for automatic login next time |
-| **My Profile (我的信息)** | Level, total matches / wins / win-rate, owned characters, skins, likes, character usage ranking |
-| **My Skins (我的皮肤)** | Every skin of every character, owned or not, with bond status |
-| **Recent Matches (最近对局)** | The latest 10 matches; expand one to see all four players' stats, click a player name for their per-round summary and relic pickups |
-| **Replay Lookup (复盘查询)** | One box that takes a **replay id** or a **player UID**: a replay id opens that single match, a UID lists that player's latest 10 matches (no login required) |
-| **Export (档案导出)** | One-click Markdown archive (usage ranking + match details), copy it or save to a file |
+| **Login** | Phone number with an SMS code or a password, plus Steam / Bilibili / TapTap channel logins; the session can be remembered for automatic login |
+| **My profile** | Level, total matches / wins / win-rate, owned characters, skins, likes received, character usage ranking |
+| **My skins** | Every skin of every character, marked owned / not owned, with bond status |
+| **Recent matches** | The latest 10 matches; expand one for all four players' stats, click a player name for their per-round summary and relic pickups |
+| **Replay lookup** | A **replay id** or a **player UID**: a replay id opens that one match, a UID lists that player's latest 10 matches |
+| **Profile export** | One-click Markdown archive (character usage ranking + match details); copy it or save it to a file |
 
-### 🎲 Replay Breakdown (new in v1.1.0, difficulty and level added in v1.2.0)
+### 🎲 Match breakdown (added in v1.1.0, difficulty and level in v1.2.0)
 
-Click a player name inside 「Recent Matches」 to open that player's replay window:
+**Click a player name** inside 「Recent matches」 to open that player's breakdown window:
 
-- **Round stats** — per-round **kills / damage / damage taken / gold / steps**; a round in which
-  they died is marked right after damage taken as「(×_×;)」
+- **Round stats** — per-round **kills / damage / damage taken / gold / steps**; a round in which they
+  died is marked right after damage taken as「(×_×;)」
+- **Per-round hand cards** — rows are rounds, columns are players, each cell split into
+  *starting hand / gained / used*; click a player name to switch to their own round-by-round detail
 - **Relic overview** — which relics were picked up in that match
-- **Relic pickup log** — grouped by round, with the source labelled (quest completion / star-up /
-  shop purchase / cycle), showing which relic was chosen out of the three choices and what came
-  up **before and after a reroll**
+- **Relic pickup log** — grouped by round with the source labelled (quest completion / star-up /
+  shop purchase / cycle), showing which relic was taken out of the three choices and what came up
+  **before and after a reroll**
 
-### 🔍 Replay Lookup (new in v1.2.0)
+### 🔍 Replay lookup (added in v1.2.0)
 
-「Replay Lookup」 in the sidebar has a single box that works out what you are asking for:
+「Replay lookup」 in the sidebar has a single box that works out what you are asking for:
 
 - **A replay id** — opens that one match in full: all four players' round-by-round stats and relic
   pickups can be expanded
@@ -49,56 +81,31 @@ difficulty.
 
 ## 📷 Screenshots
 
-**My Profile** — level / matches / win-rate / owned characters & skins / likes / usage ranking
+**My profile** — level / matches / win-rate / owned characters and skins / likes / usage ranking
 
-![My Profile](screenshots/01-profile.png)
+![My profile](screenshots/01-profile.png)
 
-**Recent Matches** — the latest 10 matches, expandable to all four players' full stats
+**Recent matches** — the latest 10 matches, expandable to all four players' full stats
 
-![Recent Matches](screenshots/02-matches.png)
+![Recent matches](screenshots/02-matches.png)
 
-**Replay Breakdown** — click a player name inside a match to open it
+**Match breakdown** — opened by **clicking a player name** inside 「Recent matches」
 
-![Replay Breakdown](screenshots/03-replay.png)
+![Match breakdown](screenshots/03-replay.png)
 
-![Replay detail](screenshots/04-replay-detail.png)
+![Breakdown detail](screenshots/04-replay-detail.png)
 
-**Replay Lookup** — enter a replay id or a player UID to see a single match or that player's latest 10 matches
+**Replay lookup** — enter a replay id or a player UID for a single match or that player's latest 10
 
-![Replay Lookup](screenshots/07-query.png)
+![Replay lookup](screenshots/07-query.png)
 
-**My Skins** — every skin of every character, owned or not, with bond status
+**My skins** — every skin of every character, marked owned / not owned, with bond status
 
-![My Skins](screenshots/05-skins.png)
+![My skins](screenshots/05-skins.png)
 
-**Login** — phone number with an SMS code or a password, plus Steam / Bilibili / TapTap channel logins; the session is remembered for auto login
+**Login**
 
 ![Login](screenshots/06-login.png)
-
----
-
-## 🚀 Quick start
-
-### Option A — prebuilt, no installation (recommended)
-
-1. Download `AstralParty_Dex_vX.Y.Z_win64.zip` from **Releases**
-2. Extract anywhere
-3. Run `星趴档案.exe`
-4. The first run shows the login page → phone number → SMS code → log in
-5. The login state is remembered; next time you go straight to your profile
-
-> **Requirements**: Windows 10 / 11 64-bit.
-> The UI needs the system **WebView2 runtime** (bundled with Win11; on Win10 usually installed
-> together with Edge). If the window comes up blank, install the WebView2 Runtime from Microsoft.
-
-### Option B — from source
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-On Windows you can also simply **double-click `run_source.bat`** (it starts the app through `pythonw`, so no console window is left behind).
 
 ---
 
@@ -106,26 +113,40 @@ On Windows you can also simply **double-click `run_source.bat`** (it starts the 
 
 ```
 AstralParty_Dex/
-├─ main.py                  Entry point (pywebview UI; data assembly, export, review cache)
+├─ main.py                  Entry point (pywebview UI; data assembly, export, breakdown cache)
+├─ run_source.bat           Source launcher (pythonw, no console window left behind)
+├─ requirements.txt         Dependencies
 ├─ astral/                  Core library
 │   ├─ paths.py             Path resolution: read-only assets vs writable data (source / frozen)
+│   ├─ log.py               Single log file (the frozen build has no console; errors go to userdata/log.txt)
+│   ├─ client_ver.py        Auto-detect and cache the client version (the handshake needs clientVer; stale ⇒ err=10012)
 │   ├─ sign.py              SDK signature algorithm + send code / login
-│   ├─ signkeys.py          Channel signing keys extracted from the game client
+│   ├─ signkeys.py          Channel signing keys (client-side constants, kept in one file so it can be dropped)
 │   ├─ sdk_login.py         Session handling, handshake, full-profile parsing
+│   ├─ game_session.py      Read the login ticket from a locally installed channel client (Steam CN / Bilibili)
+│   ├─ intl_login.py        Self-service global-server login (reuses the ticket in the local client's mmkv)
 │   ├─ client.py            Game server protocol client (framing / send / receive / routing)
 │   ├─ frame.py             Protocol frame codec (35-byte big-endian header + protobuf payload)
 │   ├─ keytable.py          The client's 256-byte permutation table (decryption)
 │   ├─ proto_loader.py      Build protobuf messages from assets/proto/*.pb
 │   ├─ replay.py            Replay parsing (room snapshot stream + packet records)
-│   ├─ review.py            Replay build (per-round diffs, relic source detection, 3-choice chains)
-│   └─ gameart.py           ★ Runtime extraction of avatars / portraits from the local game
+│   ├─ review.py            Breakdown build (per-round diffs, relic source detection, 3-choice chains, hand cards)
+│   ├─ tablegen.py          Data-table generation rules (shared by the CLI sync scripts and the runtime)
+│   ├─ game_live.py         Runtime data layer: re-extracts tables from the local client at startup
+│   └─ gameart.py           Runtime extraction of avatars / portraits from the local game
 ├─ ui/app.html              Front-end (plain HTML/CSS/JS, no framework)
 ├─ assets/
 │   ├─ app.ico / app.png    App icon
-│   ├─ data/                Read-only data tables (character_ids · heroes · skins · potential · missions · chips)
+│   ├─ data/                Read-only tables (characters · skins · potentials · map missions · cards · chips · buffs · monsters)
 │   └─ proto/               Protocol descriptors (FileDescriptorProto)
-├─ tools/                   Data pipeline + game asset extraction + one-click packaging scripts
-└─ userdata/                Generated at runtime: login state, replay cache, extracted avatars
+├─ tools/                   Data pipeline and packaging scripts
+│   ├─ sync_*_from_game.py  Extract each table from the client (reports only by default; --apply writes)
+│   ├─ fetch_*.py           Fetch game texts / map mission names / avatars and portraits
+│   ├─ verify_*.py          Data-table and breakdown invariant checks
+│   ├─ check_ui.js          UI self-check (no emoji, placeholder avatars, etc.)
+│   └─ build_exe.py / make_release.py   Build the exe / produce the release zip
+├─ screenshots/             Screenshots used by the READMEs
+└─ userdata/                Generated at runtime: session, replay and breakdown cache, extracted avatars and tables
 ```
 
 ## ⚠️ Disclaimer
@@ -152,11 +173,11 @@ python tools/build_exe.py       # → dist/星趴档案/星趴档案.exe (copy i
 python tools/make_release.py    # → AstralParty_Dex_vX.Y.Z_win64.zip (version read from main.py)
 ```
 
-`make_release.py` **deletes `userdata/` from the artifact** before zipping (it holds a
-password-less login state — shipping it would mean shipping the account), then **re-opens the
-archive to verify** that no `userdata/` / `token.json` slipped in; it also verifies that **no game
-artwork made it into the package** (avatars / portraits are extracted at runtime from the locally
-installed game, so the package contains none).
+`make_release.py` **deletes `userdata/` from the artifact** before zipping (it holds the login
+state — shipping it would mean shipping the account), then **re-opens the archive to verify** that
+no `userdata/` / `token.json` slipped in; it also verifies that **no game artwork made it into the
+package** (avatars / portraits are extracted at runtime from the locally installed game, so the
+package contains none).
 If you have run the exe inside `dist/星趴档案/` by hand, it will have created a `userdata/` —
 remember to re-package or delete it manually.
 

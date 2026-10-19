@@ -58,6 +58,7 @@ Windows可以直接**双击 `run_source.bat`**。
 
 
 - **轮次数据** —— 逐轮的**击杀 / 伤害 / 承伤 / 星币 / 步数**；该轮阵亡会在承伤后标「(×_×;)」
+- **每轮手牌** —— 行 = 轮次、列 = 玩家，每格分「开局 / 获得 / 使用」；点玩家名字切到他的逐轮明细
 - **筹码总览** —— 这局拿了哪些筹码
 - **获取筹码明细** —— 按轮次分块，标明来源（ 任务完成 / 升星 / 商店购买 /  循环往复），
   展示三选一时选了哪件筹码、以及**刷新前后**出了哪些筹码
@@ -107,24 +108,39 @@ Windows可以直接**双击 `run_source.bat`**。
 ```
 星趴档案/
 ├─ main.py                  主程序（pywebview 入口；数据组装、导出、复盘缓存）
+├─ run_source.bat           源码运行入口（pythonw 启动，不留控制台窗口）
+├─ requirements.txt         依赖清单
 ├─ astral/                  核心库
 │   ├─ paths.py             路径解析：区分只读资源与可写数据（源码 / 打包双模式）
+│   ├─ log.py               统一落盘日志（打包后无控制台，异常写 userdata/log.txt）
+│   ├─ client_ver.py        客户端版本号自动探测与缓存（握手要带 clientVer，过期会 err=10012）
 │   ├─ sign.py              SDK 签名算法 + 发送验证码 / 登录
+│   ├─ signkeys.py          渠道签名密钥（客户端内置常量，单独成文件以便移除）
 │   ├─ sdk_login.py         登录态管理、握手包获取与全量档案解析
+│   ├─ game_session.py      从本机渠道客户端读登录票（Steam 国服 / B站）
+│   ├─ intl_login.py        国际服自助登录（复用本机客户端 mmkv 里的票）
 │   ├─ client.py            游戏服务器协议客户端（帧封装 / 收发 / 路由）
 │   ├─ frame.py             协议帧编解码（35 字节大端头 + protobuf 载荷）
 │   ├─ keytable.py          客户端内置的 256 字节置换表（解密用）
 │   ├─ proto_loader.py      从 assets/proto/*.pb 构造 protobuf 消息
 │   ├─ replay.py            回放文件解析（房间快照流 + 协议包记录）
-│   ├─ review.py            复盘构建（逐轮差分、筹码来源判定、三选一链）
+│   ├─ review.py            复盘构建（逐轮差分、筹码来源判定、三选一链、手牌）
+│   ├─ tablegen.py          数据表生成规则（CLI 同步脚本与运行时共用同一份）
+│   ├─ game_live.py         运行时数据层：启动时按本机客户端现抽配置表
 │   └─ gameart.py           运行时从本机游戏资源包提取头像 / 立绘头像
 ├─ ui/app.html              前端界面（原生 HTML/CSS/JS，无框架）
 ├─ assets/
 │   ├─ app.ico / app.png    应用图标
-│   ├─ data/                只读数据表（character_ids · heroes · skins · potential · missions · chips）
+│   ├─ data/                只读数据表（角色 · 皮肤 · 潜能 · 地图任务 · 卡牌 · 筹码 · 增益 · 怪物）
 │   └─ proto/               协议描述符（FileDescriptorProto）
-├─ tools/                   数据管线脚本 + 游戏资源提取 + 一键打包脚本
-└─ userdata/                运行时生成：登录态、回放缓存、提取出的头像
+├─ tools/                   数据管线与打包脚本
+│   ├─ sync_*_from_game.py  按客户端现抽各类数据表（默认只报差异，--apply 才写）
+│   ├─ fetch_*.py           拉取游戏文案 / 地图任务名 / 头像立绘
+│   ├─ verify_*.py          数据表与复盘不变量校验
+│   ├─ check_ui.js          界面自检（无 emoji、占位头像等）
+│   └─ build_exe.py / make_release.py   打包 exe / 生成发布 zip
+├─ screenshots/             README 截图
+└─ userdata/                运行时生成：登录态、回放与复盘缓存、抽出的头像和数据表
 ```
 
 ## ⚠️ 免责声明
