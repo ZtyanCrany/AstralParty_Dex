@@ -274,6 +274,12 @@ def _player_chip_events(rp, uid, chips, all_groups):
     all_mids = sorted({m for st in rp.mission_states() for m in st})
     has_cycle = CYCLE_CHIP in chips
     cycle_frame = chips.get(CYCLE_CHIP)
+    # 循环往复的原话：「3回合后选择并获得1个强化筹码」—— 只发【一次】。
+    #   以前只要筹码没被别的来源认领，就一律记成循环往复，于是第 7 轮（离第 2 轮已 5 轮）
+    #   那张也被算进去，看起来像「效果发了两次」。这里按「拿到它的轮次 +3、允许 ±1 轮
+    #   的轮界误差、且全程只认一次」来卡死。
+    cycle_round = _round_at(rp, uid, cycle_frame) if cycle_frame is not None else None
+    cycle_used = False
     offers = _offer_events(rp, uid)
     slices = _chain_slices(offers, chips)
     claimed = {}                      # 已被哪个事件认领（判断循环往复）
@@ -293,6 +299,12 @@ def _player_chip_events(rp, uid, chips, all_groups):
             return (9999, 9999)
         hit = [i for i, g in enumerate(o['chain']) if cid in g['cands']]
         return (o['ord'], hit[-1] if hit else 9999)
+
+    def _cycle_ok(rnd):
+        """这张筹码能不能算循环往复给的（只发一次 + 落在 +3 轮的窗口里）"""
+        if not has_cycle or cycle_used or cycle_round is None or rnd is None:
+            return False
+        return abs(rnd - (cycle_round + 3)) <= 1
 
     _order = {cid: _ev_ord(cid, f) for cid, f in chips.items()}
     for cid, f in sorted(chips.items(), key=lambda kv: (kv[1], _order[kv[0]])):
@@ -357,7 +369,7 @@ def _player_chip_events(rp, uid, chips, all_groups):
         elif lv_now and not reused:
             source, arg = 'star', lv_now
             key2 = ('star', lv_now)
-        elif reused and has_cycle:
+        elif reused and _cycle_ok(rnd):
             source = 'cycle'          # 同一次升级/任务已发过一个 ⇒ 这个是循环往复给的
             arg = None                # 循环往复没有编号，不携带任务号
             key2 = None
@@ -365,11 +377,13 @@ def _player_chip_events(rp, uid, chips, all_groups):
             source = 'task'           # 同帧多人拿到（没找到任务翻转也要标任务）
             key2 = None
         elif chain:
-            source = 'cycle' if (has_cycle and cycle_frame is not None and f > cycle_frame) else 'star'
+            source = 'cycle' if _cycle_ok(rnd) else 'star'
             key2 = None
         else:
             source = 'unknown'
             key2 = None
+        if source == 'cycle':
+            cycle_used = True         # 只发一次：后面再出现就不许再记成循环往复了
         if key2:
             used[key2] = True
         if claim:
