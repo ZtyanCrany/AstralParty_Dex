@@ -202,7 +202,7 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.6'  # 工具版本号
+VERSION = 'v1.2.7'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 # 回放服务器按区服分，两服的**回放号互不相通**（拿一边的号查另一边一律 404）。
 # 登录时按 profile.region 设一次 REPLAY_REGION，之后全程跟着走 ——
@@ -1205,6 +1205,82 @@ class Api:
         self.sid = ''
         self.profile = None
         self._sess = None           # 复用的游戏连接（见 _session）
+        self._upd = {}              # 一键更新的下载状态（见 update_*）
+
+    # ── 检查更新 / 一键更新 ────────────────────────────────────
+    def update_check(self, force=False):
+        from astral import update as U
+        try:
+            d = U.check(VERSION, force=bool(force))
+        except Exception as e:
+            return {'ok': False, 'newer': False, 'current': VERSION,
+                    'url': U.PAGE_LATEST, 'error': '%s' % e,
+                    'canApply': False, 'applyHint': ''}
+        ok_apply, why = U.can_self_update()
+        d['canApply'] = bool(ok_apply)
+        d['applyHint'] = why
+        return d
+
+    def update_download(self, url=''):
+        """后台线程下载更新包；进度用 update_progress() 轮询。"""
+        from astral import update as U
+        if self._upd.get('state') == 'running':
+            return {'ok': False, 'msg': '正在下载中…'}
+        info = U.check(VERSION)
+        url = url or info.get('asset') or ''
+        if not url:
+            return {'ok': False, 'msg': '没拿到下载地址，请到 GitHub 页面手动下载'}
+        dest = Path(paths.DATA_DIR) / '_update.zip'
+        self._upd = {'state': 'running', 'done': 0, 'total': 0, 'msg': ''}
+
+        def work():
+            try:
+                U.download(url, dest, progress=self._upd_tick)
+                self._upd.update(state='done', path=str(dest), msg='')
+            except Exception as e:      # noqa: BLE001
+                self._upd.update(state='error', msg='%s' % e)
+
+        threading.Thread(target=work, daemon=True).start()
+        return {'ok': True}
+
+    def _upd_tick(self, done, total):
+        self._upd['done'], self._upd['total'] = done, total
+
+    def update_progress(self):
+        return dict(self._upd)
+
+    def update_apply(self):
+        """解压 → 写重启脚本 → 退出本进程（脚本负责覆盖和重启）。"""
+        from astral import update as U
+        if self._upd.get('state') != 'done':
+            return {'ok': False, 'msg': '还没下载完'}
+        ok, why = U.can_self_update()
+        if not ok:
+            return {'ok': False, 'msg': why}
+        try:
+            root = U.prepare(self._upd.get('path') or '')
+            U.apply(root, U.app_dir(), os.getpid(), restart=True)
+        except Exception as e:          # noqa: BLE001
+            return {'ok': False, 'msg': '更新失败：%s' % e}
+
+        def bye():
+            time.sleep(0.9)
+            os._exit(0)                 # 让 .bat 接手覆盖；别走退出流程拖时间
+
+        threading.Timer(0.2, bye).start()
+        return {'ok': True}
+
+    def open_url(self, url):
+        """只允许打开本仓库的 GitHub 页面，不做通用 URL 打开器。"""
+        u = str(url or '')
+        if not re.match(r'^https://github\.com/ZtyanCrany/AstralParty_Dex(/|$)', u):
+            return {'ok': False, 'msg': '链接不在白名单内'}
+        import webbrowser
+        try:
+            webbrowser.open(u)
+            return {'ok': True}
+        except Exception as e:          # noqa: BLE001
+            return {'ok': False, 'msg': '%s' % e}
 
     # ── ① 发验证码 ──
     def send_code(self, phone: str):

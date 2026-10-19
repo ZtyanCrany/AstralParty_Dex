@@ -555,6 +555,22 @@
   .hero-name i{ font-size:11px; color:#8C8471; font-style:normal; }
   .tag.pur{ background:#E9E1F4; color:#6B4B9C; border-color:#D7CAEC; }
   .tag.off{ background:transparent; color:#BDB6A4; border:1px dashed #D9D2C2; }
+
+  /* ── 版本徽标 + 更新弹窗 ── */
+  #verTag{ cursor:pointer; user-select:none; }
+  #verTag:hover{ color:#8A7E66; }
+  .newdot{ display:inline-block; margin-left:5px; padding:1px 5px; border-radius:7px;
+           background:#D8552F; color:#fff; font-size:9px; font-style:normal;
+           letter-spacing:.4px; vertical-align:1px; }
+  .upd-note{ max-height:44vh; overflow:auto; white-space:pre-wrap; font-size:12.5px;
+             line-height:1.75; color:#4A4336; background:#FAF7F0;
+             border:1px solid var(--line); border-radius:10px;
+             padding:11px 13px; margin:10px 0 12px; }
+  .upd-bar{ height:6px; border-radius:3px; background:#EAE4D6; overflow:hidden; margin:10px 0 6px; }
+  .upd-bar i{ display:block; height:100%; width:0; background:#8FA98A; transition:width .2s; }
+  .upd-st{ font-size:12px; color:#8A8272; min-height:17px; }
+  .upd-btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  .upd-btns button:disabled{ opacity:.5; cursor:default; filter:none; }
 </style>
 </head>
 <body>
@@ -566,6 +582,21 @@
     <div class="mbtns">
       <button class="ghost" onclick="modalNo()">取消</button>
       <button id="modalYes" onclick="modalYes()">确定</button>
+    </div>
+  </div>
+</div>
+<div id="upd" class="modal hide" onclick="if(event.target===this)closeUpdate()">
+  <div class="mbox" style="width:560px">
+    <div class="mtitle" id="updTitle">检查更新</div>
+    <div class="mtext" id="updSub"></div>
+    <div class="upd-note" id="updNotes" style="display:none"></div>
+    <div class="upd-bar" id="updBar" style="display:none"><i id="updBarIn"></i></div>
+    <div class="upd-st" id="updSt"></div>
+    <div class="upd-btns">
+      <button class="ghost" onclick="closeUpdate()">关闭</button>
+      <button class="ghost" id="updRecheck" onclick="checkUpdate(true, true)">重新检查</button>
+      <button class="ghost" id="updPage" onclick="openReleasePage()">GitHub 页面</button>
+      <button id="updGo" onclick="startUpdate()">一键更新</button>
     </div>
   </div>
 </div>
@@ -602,7 +633,7 @@
     <div id="who">
       <button class="logout" id="btnLogout" style="display:none" onclick="logout()">退出登录</button>
       <b>作者</b>ZytanCrany &amp; Nemophila
-      <span class="ver" id="verTag">版本 —</span>
+      <span class="ver" id="verTag" onclick="openUpdate()" title="检查更新"><b id="verNum">版本 —</b><i class="newdot" id="verNew" style="display:none">NEW</i></span>
     </div>
   </div>
   <div id="main">
@@ -1946,10 +1977,123 @@ window.loadQStats = async (i, body) => {
 // 版本号由后端注入（唯一真源 = main.py 的 VERSION）
 window.addEventListener("pywebviewready", () => {
   window.pywebview.api.login_state().then(d => {
-    const e = document.getElementById("verTag");
+    const e = document.getElementById("verNum");
     if (e && d && d.version) e.textContent = "版本 " + d.version;
+    checkUpdate(false);            // 静默查一次；失败不打扰
   }).catch(() => {});
 });
+
+// ══ 检查更新 / 一键更新 ══════════════════════════════════════
+let UPD = null;
+
+async function checkUpdate(force, fromDialog) {
+  const st = document.getElementById("updSt");
+  if (fromDialog && st) st.textContent = "正在检查…";
+  try {
+    UPD = await window.pywebview.api.update_check(!!force);
+  } catch (e) {
+    UPD = { ok: false, error: String(e) };
+  }
+  const badge = document.getElementById("verNew");
+  if (badge) badge.style.display = (UPD && UPD.ok && UPD.newer) ? "inline-block" : "none";
+  if (fromDialog) renderUpdate();
+  return UPD;
+}
+
+function renderUpdate() {
+  const title = document.getElementById("updTitle");
+  const sub = document.getElementById("updSub");
+  const notes = document.getElementById("updNotes");
+  const st = document.getElementById("updSt");
+  const go = document.getElementById("updGo");
+  const bar = document.getElementById("updBar");
+  bar.style.display = "none";
+  go.disabled = true;
+  if (!UPD || !UPD.ok) {
+    title.textContent = "检查更新失败";
+    sub.textContent = UPD && UPD.error
+      ? ("连不上 GitHub：" + UPD.error)
+      : "连不上 GitHub，请稍后再试。";
+    notes.style.display = "none";
+    st.textContent = "也可以点「GitHub 页面」手动下载。";
+    return;
+  }
+  if (!UPD.newer) {
+    title.textContent = "已是最新版本";
+    sub.textContent = "当前 " + UPD.current + " · 远端 " + UPD.tag;
+    notes.style.display = "none";
+    st.textContent = "";
+    return;
+  }
+  title.textContent = "发现新版本 " + UPD.tag;
+  sub.textContent = "当前 " + UPD.current + " → 最新 " + UPD.tag;
+  notes.textContent = (UPD.notes || "（这个版本没有写更新说明）")
+    .replace(/^#{1,4}\s*/gm, "").trim();      // 去掉 Markdown 的井号，保留条目换行
+  notes.style.display = "";
+  if (UPD.canApply) {
+    go.disabled = false;
+    st.textContent = "";
+  } else {
+    st.textContent = UPD.applyHint || "当前环境不支持一键更新，请到 GitHub 页面下载。";
+  }
+}
+
+function openUpdate() {
+  document.getElementById("upd").classList.remove("hide");
+  renderUpdate();
+  checkUpdate(false, true);
+}
+
+function closeUpdate() {
+  document.getElementById("upd").classList.add("hide");
+}
+
+function openReleasePage() {
+  const u = (UPD && UPD.url) || "https://github.com/ZtyanCrany/AstralParty_Dex/releases";
+  window.pywebview.api.open_url(u);
+}
+
+async function startUpdate() {
+  const go = document.getElementById("updGo");
+  const st = document.getElementById("updSt");
+  const bar = document.getElementById("updBar");
+  const fill = document.getElementById("updBarIn");
+  go.disabled = true;
+  bar.style.display = "";
+  fill.style.width = "0%";
+  st.textContent = "正在下载…";
+  const r = await window.pywebview.api.update_download((UPD && UPD.asset) || "");
+  if (!r || !r.ok) {
+    st.textContent = (r && r.msg) || "下载失败";
+    go.disabled = false;
+    return;
+  }
+  const timer = setInterval(async () => {
+    let p = {};
+    try { p = await window.pywebview.api.update_progress(); } catch (e) {}
+    if (p && p.state === "running") {
+      const pct = p.total ? Math.min(100, Math.round(p.done * 100 / p.total)) : 0;
+      fill.style.width = pct + "%";
+      st.textContent = p.total
+        ? "正在下载… " + pct + "%（" + (p.done / 1048576).toFixed(1) + " / " + (p.total / 1048576).toFixed(1) + " MB）"
+        : "正在下载… " + (p.done / 1048576).toFixed(1) + " MB";
+      return;
+    }
+    clearInterval(timer);
+    if (p && p.state === "error") {
+      st.textContent = "下载失败：" + (p.msg || "");
+      go.disabled = false;
+      return;
+    }
+    fill.style.width = "100%";
+    st.textContent = "下载完成，正在安装并重启…";
+    const a = await window.pywebview.api.update_apply();
+    if (!a || !a.ok) {
+      st.textContent = (a && a.msg) || "安装失败";
+      go.disabled = false;
+    }
+  }, 350);
+}
 </script>
 </body>
 </html>
