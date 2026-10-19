@@ -7,7 +7,7 @@
 
 A small self-service tool: log in with your own account to browse your profile, skins and recent
 matches, look a match up by replay id or a player by UID, then open any match to see **each
-player's round-by-round summary, relic pickups and per-round hand cards**.
+player's round-by-round summary, chip pickups and the per-round hand**.
 Everything is processed on your own machine; game artwork is read from the copy of the game
 installed locally.
 
@@ -49,28 +49,28 @@ On Windows you can also simply **double-click `run_source.bat`**.
 | **Login** | Phone number with an SMS code or a password, plus Steam / Bilibili / TapTap channel logins; the session can be remembered for automatic login |
 | **My profile** | Level, total matches / wins / win-rate, owned characters, skins, likes received, character usage ranking |
 | **My skins** | Every skin of every character, marked owned / not owned, with bond status |
-| **Recent matches** | The latest 10 matches; expand one for all four players' stats, click a player name for their per-round summary and relic pickups |
+| **Recent matches** | The latest 10 matches; expand one for all four players' stats, click a player name for their per-round summary and chip pickups |
 | **Replay lookup** | A **replay id** or a **player UID**: a replay id opens that one match, a UID lists that player's latest 10 matches |
 | **Profile export** | One-click Markdown archive (character usage ranking + match details); copy it or save it to a file |
 
 ### 🎲 Match breakdown (added in v1.1.0, difficulty and level in v1.2.0)
 
-**Click a player name** inside 「Recent matches」 to open that player's breakdown window:
+**Click a player name** inside **Recent matches** to open that player's breakdown window:
 
-- **Round stats** — per-round **kills / damage / damage taken / gold / steps**; a round in which they
-  died is marked right after damage taken as「(×_×;)」
-- **Per-round hand cards** — rows are rounds, columns are players, each cell split into
+- **Round stats** — per-round **kills / damage / damage taken / coins / steps**; a round in which they
+  died is marked right after damage taken as `(×_×;)`
+- **Per-round hand** — rows are rounds, columns are players, each cell split into
   *starting hand / gained / used*; click a player name to switch to their own round-by-round detail
-- **Relic overview** — which relics were picked up in that match
-- **Relic pickup log** — grouped by round with the source labelled (quest completion / star-up /
-  shop purchase / cycle), showing which relic was taken out of the three choices and what came up
+- **Chip overview** — which chips were picked up in that match
+- **Chip pickup log** — grouped by round with the source labelled (task completion / star-up /
+  Chip Shop purchase / cycle), showing which chip was taken from the three choices and what came up
   **before and after a reroll**
 
 ### 🔍 Replay lookup (added in v1.2.0)
 
-「Replay lookup」 in the sidebar has a single box that works out what you are asking for:
+**Replay lookup** in the sidebar has a single box that works out what you are asking for:
 
-- **A replay id** — opens that one match in full: all four players' round-by-round stats and relic
+- **A replay id** — opens that one match in full: all four players' round-by-round stats and chip
   pickups can be expanded
 - **A player UID** — lists that player's latest 10 matches; click any of them for the full breakdown
 
@@ -89,7 +89,7 @@ difficulty.
 
 ![Recent matches](screenshots/02-matches.png)
 
-**Match breakdown** — opened by **clicking a player name** inside 「Recent matches」
+**Match breakdown** — opened by **clicking a player name** inside **Recent matches**
 
 ![Match breakdown](screenshots/03-replay.png)
 
@@ -130,7 +130,7 @@ AstralParty_Dex/
 │   ├─ keytable.py          The client's 256-byte permutation table (decryption)
 │   ├─ proto_loader.py      Build protobuf messages from assets/proto/*.pb
 │   ├─ replay.py            Replay parsing (room snapshot stream + packet records)
-│   ├─ review.py            Breakdown build (per-round diffs, relic source detection, 3-choice chains, hand cards)
+│   ├─ review.py            Breakdown build (per-round diffs, chip source detection, 3-choice chains, hand cards)
 │   ├─ tablegen.py          Data-table generation rules (shared by the CLI sync scripts and the runtime)
 │   ├─ game_live.py         Runtime data layer: re-extracts tables from the local client at startup
 │   └─ gameart.py           Runtime extraction of avatars / portraits from the local game
@@ -207,3 +207,5 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## 💛 Credits
 
 - Data sources: the official game client and the 吉星派对 Wiki
+- Terminology follows the English release (**Chips** / **Coins** / **Chip Shop**); stat labels use the
+  usual English phrasing (Kills / Damage / Damage Taken / Steps / Round).
