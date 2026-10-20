@@ -651,7 +651,6 @@
   .htab td .hc{ display:block; width:fit-content; max-width:100%; margin-bottom:3px; }
   .htab td .hc:last-child{ margin-bottom:0; }
   .hc.dashed{ background:var(--s-FBF8F2); border-style:dashed; border-color:var(--b-CFC6B2); color:var(--t-8A8377); }
-  .hc.used{ background:var(--s-F4F1EA); border-color:var(--b-E4DDCC); color:var(--t-A79F91); text-decoration:line-through; }
   /* 卡牌类型配色：取自游戏里卡牌左上角那个小徽标（咒=青绿 #00D0A0，建=粉 #F880A0） */
   /* 类型用左侧色条表示（不再在牌名前塞小字徽标）：色值取自游戏卡面左上角徽标 */
   .hc.t-attack{ background:var(--s-FBEFE7); border-color:var(--b-F0D9C8); border-left:3px solid var(--b-D9754A); color:var(--t-A9542C); }
@@ -669,6 +668,12 @@
   .hc.t-counter{ background:var(--s-EDF5F1); border-color:var(--b-D8E9E1); border-left:3px solid var(--b-3F8A72); color:var(--t-3F7A65); }
   .hc.t-curse{ background:var(--s-E4FBF5); border-color:var(--b-B4EEDD); border-left:3px solid var(--b-00C79A); color:var(--t-0B7A63); }
   .hc.t-build{ background:var(--s-FDEDF2); border-color:var(--b-F6C9D6); border-left:3px solid var(--b-F880A0); color:var(--t-A63A5C); }
+  /* 用掉的牌：整张压灰 + 一道加粗的橙色划线。
+     ★ 必须排在 .hc.t-* 之后，否则类型配色会把灰底和字色盖回去（之前的划线看不见就是这个原因）。 */
+  .hc.used{ background:var(--s-EFEBE1); border-color:var(--b-DCD5C4); border-left-color:var(--b-CFC6B2);
+            color:var(--t-8A8377); text-decoration:line-through;
+            text-decoration-thickness:1.7px; text-decoration-color:var(--accent);
+            text-decoration-skip-ink:none; }
   .crow{ display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
   .crow .rf{ font-size:11px; font-weight:600; flex:0 0 auto; min-width:30px;
              white-space:nowrap; }
@@ -2247,7 +2252,7 @@ function render(d){
       return '<div class="rvsec nostick"><h4>每轮手牌</h4>' +
              '<div class="rvfoot">这局回放没解析到手牌数据</div></div>';
     const grp = (label, cs) => (!cs || !cs.length) ? '' :
-      '<div class="hgrp"><span class="hlab">' + label + '</span>' +
+      '<div class="hgrp">' + (label ? '<span class="hlab">' + label + '</span>' : '') +
       cs.map(c => window.cardChip(c)).join('') +
       '</div>';
     let head = '<tr><th class="hrt">轮次</th>';
@@ -2264,7 +2269,8 @@ function render(d){
       body += '<tr><th class="hrt">第 ' + r.round + ' 轮</th>';
       ps.forEach(p => {
         const d = (r.players || {})[String(p.uid)] || {};
-        body += '<td>' + (grp('开局', d.start) || '<span class="rvfoot">—</span>') + '</td>';
+        // 总览里每一格都是「开局」，标签就没信息量了，去掉
+        body += '<td>' + (grp('', d.start) || '<span class="rvfoot">—</span>') + '</td>';
       });
       body += '</tr>';
     });
