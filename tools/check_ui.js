@@ -98,8 +98,8 @@ chk('默认是「每轮手牌」总览', hm.includes('每轮手牌'));
 chk('矩阵按轮次分行', /<th class="hrt">第 \d+ 轮<\/th>/.test(hm));
 chk('每个玩家一列表头（含头像 + 名字，可点）', /class="hpl" onclick="rvDetail\(/.test(hm));
 chk('每张卡占一行（td 里是块级 .hc）', /class="hc t-\w+"/.test(hm));
-chk('总览页只列开局手牌（不再重复标「开局」小字）、不显示获得/使用',
-  !hm.includes('>获得<') && !hm.includes('>使用<') && !hm.includes('hlab'));
+chk('总览页只列开局手牌，每格标「共 n 张」，不显示获得/使用',
+  !hm.includes('>获得<') && !hm.includes('>使用<') && /共\d+张/.test(hm) && !hm.includes('>开局<'));
 chk('表格里不标牌来源（无「商店购买」「开局发放」字样）',
   !/商店购买|开局发放|卡牌效果/.test(hm));
 chk('矩阵里没有出牌记录表', !hm.includes('出牌记录'));

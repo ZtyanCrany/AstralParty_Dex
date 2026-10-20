@@ -668,11 +668,10 @@
   .hc.t-counter{ background:var(--s-EDF5F1); border-color:var(--b-D8E9E1); border-left:3px solid var(--b-3F8A72); color:var(--t-3F7A65); }
   .hc.t-curse{ background:var(--s-E4FBF5); border-color:var(--b-B4EEDD); border-left:3px solid var(--b-00C79A); color:var(--t-0B7A63); }
   .hc.t-build{ background:var(--s-FDEDF2); border-color:var(--b-F6C9D6); border-left:3px solid var(--b-F880A0); color:var(--t-A63A5C); }
-  /* 用掉的牌：整张压灰 + 一道加粗的橙色划线。
-     ★ 必须排在 .hc.t-* 之后，否则类型配色会把灰底和字色盖回去（之前的划线看不见就是这个原因）。 */
-  .hc.used{ background:var(--s-EFEBE1); border-color:var(--b-DCD5C4); border-left-color:var(--b-CFC6B2);
-            color:var(--t-8A8377); text-decoration:line-through;
-            text-decoration-thickness:1.7px; text-decoration-color:var(--accent);
+  /* 用掉的牌：保留卡牌类型底色（不然看不出是什么牌），只靠一道加粗划线 + 轻微淡化区分。
+     ★ 必须排在 .hc.t-* 之后，否则类型配色会把划线盖回去。 */
+  .hc.used{ opacity:.72; text-decoration:line-through;
+            text-decoration-thickness:1.7px; text-decoration-color:var(--ink);
             text-decoration-skip-ink:none; }
   .crow{ display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
   .crow .rf{ font-size:11px; font-weight:600; flex:0 0 auto; min-width:30px;
@@ -753,9 +752,12 @@
   #heroes tr.noh{ opacity:.5; }
   #heroes tr.noh:hover{ opacity:.8; }
   /* 服务端统计少算的角色：胜场/胜率后一个小问号点，悬停出自绘提示 */
-  .qstale{ position:relative; display:inline-flex; align-items:center; justify-content:center;
-           width:13px; height:13px; margin-left:5px; border-radius:50%; background:var(--s-C0453A); color:var(--t-FFF);
-           font-size:9px; font-style:normal; font-weight:700; line-height:1; vertical-align:1px;
+  /* 胜场/胜率两列常驻右侧槽位：问号绝对定位塞进槽里，数字不会被顶偏 */
+  #heroes td.qcol{ position:relative; padding-right:26px; }
+  .qstale{ position:absolute; right:8px; top:50%; transform:translateY(-50%);
+           display:inline-flex; align-items:center; justify-content:center;
+           width:13px; height:13px; border-radius:50%; background:var(--s-C0453A); color:var(--t-FFF);
+           font-size:9px; font-style:normal; font-weight:700; line-height:1;
            cursor:help; }
   .qstale::after{ content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 6px);
            transform:translateX(-50%); background:var(--s-3A342C); color:var(--t-F5F1E8); font-size:11px; font-weight:400;
@@ -1899,8 +1901,8 @@ window.paintHeroes = () => {
         </div>
       </td>
       <td class="num">${h.n||'—'}</td>
-      <td class="num">${h.w||'—'}${h.stale?STALE2:''}</td>
-      <td class="num">${h.n?(100*h.w/h.n).toFixed(2)+'%':'—'}${h.stale?STALE2:''}</td>
+      <td class="num qcol">${h.w||'—'}${h.stale?STALE2:''}</td>
+      <td class="num qcol">${h.n?(100*h.w/h.n).toFixed(2)+'%':'—'}${h.stale?STALE2:''}</td>
       <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
       <td class="num">${h.owned===false?'—':(h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>'))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
@@ -2269,8 +2271,10 @@ function render(d){
       body += '<tr><th class="hrt">第 ' + r.round + ' 轮</th>';
       ps.forEach(p => {
         const d = (r.players || {})[String(p.uid)] || {};
-        // 总览里每一格都是「开局」，标签就没信息量了，去掉
-        body += '<td>' + (grp('', d.start) || '<span class="rvfoot">—</span>') + '</td>';
+        // 标签改成「共 n 张」：既说明这是开局手牌，也把上下轮次隔开
+        const st = d.start || [];
+        body += '<td>' + (grp(st.length ? '共' + st.length + '张' : '', st) ||
+                          '<span class="rvfoot">—</span>') + '</td>';
       });
       body += '</tr>';
     });
