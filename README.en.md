@@ -1,5 +1,10 @@
 # AstralParty_Dex
 
+[![License](https://img.shields.io/github/license/ZtyanCrany/AstralParty_Dex?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ZtyanCrany/AstralParty_Dex?style=flat-square)](https://github.com/ZtyanCrany/AstralParty_Dex/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?style=flat-square&logo=windows&logoColor=white)](#-quick-start)
+[![Downloads](https://img.shields.io/github/downloads/ZtyanCrany/AstralParty_Dex/total?style=flat-square)](https://github.com/ZtyanCrany/AstralParty_Dex/releases)
+
 **星趴档案** ｜ 中文 README → [README.md](README.md)
 
 > For 《星引擎 Party》/《Astral Party》 (the CN server is titled 《吉星派对》)<br>
@@ -29,7 +34,7 @@ On Windows you can also simply **double-click `run_source.bat`**.
 
 ### Option B — prebuilt, no installation
 
-1. Download `AstralParty_Dex_vX.Y.Z_win64.zip` from **Releases**
+1. Download `AstralParty_Dex_vX.Y.Z_win64.zip` from [**Releases**](https://github.com/ZtyanCrany/AstralParty_Dex/releases)
 2. Extract it anywhere
 3. Run `星趴档案.exe`
 4. Pick any login method on the start page. The first launch extracts artwork from the local game,

@@ -1,5 +1,10 @@
 # 星趴档案
 
+[![License](https://img.shields.io/github/license/ZtyanCrany/AstralParty_Dex?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/ZtyanCrany/AstralParty_Dex?style=flat-square)](https://github.com/ZtyanCrany/AstralParty_Dex/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg?style=flat-square&logo=windows&logoColor=white)](#-快速开始)
+[![Downloads](https://img.shields.io/github/downloads/ZtyanCrany/AstralParty_Dex/total?style=flat-square)](https://github.com/ZtyanCrany/AstralParty_Dex/releases)
+
 **AstralParty_Dex** ｜ English README → [README.en.md](README.en.md)
 
 > 适用于游戏作品《星引擎 Party》《Astral Party》（国服又名《吉星派对》）<br>
@@ -29,7 +34,7 @@ Windows可以直接**双击 `run_source.bat`**。
 
 ### 方式二：下载免安装版
 
-1. Releases 下载 `AstralParty_Dex_vX.Y.Z_win64.zip`
+1. 从 [Releases](https://github.com/ZtyanCrany/AstralParty_Dex/releases) 下载 `AstralParty_Dex_vX.Y.Z_win64.zip`
 2. 解压到任意位置
 3. 双击 `星趴档案.exe`
 4. 在主页面选择任意登录方式，第一次启动会在本机获取美术资源，有暂时的较大占用
