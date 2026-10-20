@@ -752,9 +752,9 @@
   #heroes tr.noh{ opacity:.5; }
   #heroes tr.noh:hover{ opacity:.8; }
   /* 服务端统计少算的角色：胜场/胜率后一个小问号点，悬停出自绘提示 */
-  /* 胜场/胜率两列常驻右侧槽位：问号绝对定位塞进槽里，数字不会被顶偏 */
-  #heroes td.qcol{ position:relative; padding-right:26px; }
-  .qstale{ position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  /* 问号挂在数字自己身上（left:100% 贴数字右缘），既不参与布局、也不会离得远 */
+  #heroes .qv{ position:relative; display:inline-block; }
+  .qstale{ position:absolute; left:100%; margin-left:4px; top:50%; transform:translateY(-50%);
            display:inline-flex; align-items:center; justify-content:center;
            width:13px; height:13px; border-radius:50%; background:var(--s-C0453A); color:var(--t-FFF);
            font-size:9px; font-style:normal; font-weight:700; line-height:1;
@@ -1901,8 +1901,8 @@ window.paintHeroes = () => {
         </div>
       </td>
       <td class="num">${h.n||'—'}</td>
-      <td class="num qcol">${h.w||'—'}${h.stale?STALE2:''}</td>
-      <td class="num qcol">${h.n?(100*h.w/h.n).toFixed(2)+'%':'—'}${h.stale?STALE2:''}</td>
+      <td class="num"><span class="qv">${h.w||'—'}${h.stale?STALE2:''}</span></td>
+      <td class="num"><span class="qv">${h.n?(100*h.w/h.n).toFixed(2)+'%':'—'}${h.stale?STALE2:''}</span></td>
       <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
       <td class="num">${h.owned===false?'—':(h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>'))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
