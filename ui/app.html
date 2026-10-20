@@ -1895,7 +1895,7 @@ window.paintHeroes = () => {
       </td>
       <td class="num">${h.n||'—'}</td>
       <td class="num">${h.w||'—'}${h.stale?STALE2:''}</td>
-      <td class="num">${h.n?Math.round(100*h.w/h.n)+'%':'—'}${h.stale?STALE2:''}</td>
+      <td class="num">${h.n?(100*h.w/h.n).toFixed(2)+'%':'—'}${h.stale?STALE2:''}</td>
       <td class="num">${Number.isFinite(h.lv)?h.lv:'—'}</td>
       <td class="num">${h.owned===false?'—':(h.brk==='已激发'?'<span class="tag pur">已激发</span>':(h.brk==='未开放'?'<span class="tag off">问了吗</span>':'<span class="tag">未</span>'))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
