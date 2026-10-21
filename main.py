@@ -55,9 +55,12 @@ def _probe_ver_login(host, port, region):
         return sid or '', DEFAULT_DEVICE_ID
 
     kind = 'abroad' if region == 'intl' else 'cn'
+    # 海外服对连续握手限流更严：候选之间留更长间隔，握手没回应就停手
     return client_ver.probe(host, port, make_session,
                             base=client_ver.resolve(kind), kind=kind,
-                            extra=DEFAULT_EXTRA)
+                            extra=DEFAULT_EXTRA,
+                            gap=4.0 if region == 'intl' else 2.0,
+                            stop_on_timeout=(region == 'intl'))
 
 GAME_HOST, GAME_PORT = '101.132.186.71', 8800
 
@@ -202,7 +205,7 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.8'  # 工具版本号
+VERSION = 'v1.2.9'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 # 回放服务器按区服分，两服的**回放号互不相通**（拿一边的号查另一边一律 404）。
 # 登录时按 profile.region 设一次 REPLAY_REGION，之后全程跟着走 ——
@@ -1699,7 +1702,24 @@ class Api:
             c = C.AstralClient(intl_login.GAME_HOST, intl_login.GAME_PORT,
                                timeout=20.0)
             c.connect()
-            c.login_abroad(tok, device_id=did)
+            try:
+                c.login_abroad(tok, device_id=did)
+            except C.ProtocolError as e:
+                if '10012' not in str(e):
+                    raise
+                # 客户端版本过期（两服同步更新，游戏一更新两边一起变）：
+                # 先按缓存/本机线索重取，再自动试探候选版本
+                c2, _ver, _s2c = _probe_ver_login(intl_login.GAME_HOST,
+                                                  intl_login.GAME_PORT, 'intl')
+                if c2 is None:
+                    raise C.ProtocolError(
+                        'err=10012：國際服客戶端版本不匹配（遊戲剛更新過）。'
+                        '自動探測沒成功 —— 請先開一次國際服客戶端，再點登入。')
+                try:
+                    c.close()
+                except Exception:
+                    pass
+                c = c2
             self._sess = c
             return c
         sid, why = _auto()

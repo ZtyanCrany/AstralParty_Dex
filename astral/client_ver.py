@@ -115,16 +115,39 @@ def detect_local():
     return from_launcher_log() or from_package_info()
 
 
-def resolve(kind='cn'):
-    """当前应使用的版本号：探测缓存 → 本机线索（仅国服）→ 代码内置默认。
+def _ver_key(v):
+    """版本号比较键：'3.2.0.0' → (3, 2, 0, 0)，位数不同也能比。"""
+    parts = []
+    for seg in str(v or '').split('.'):
+        try:
+            parts.append(int(seg))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
 
-    缓存优先，因为它是确实被服务器接受过的值。本机线索取自国服启动器，
-    不用于海外服 —— 两服版本不同步，海外服只认缓存与内置默认。
+
+def _newer(a, b):
+    """取两者中较新的版本号（版本只向前走）。"""
+    if not a:
+        return b
+    if not b:
+        return a
+    return a if _ver_key(a) >= _ver_key(b) else b
+
+
+def resolve(kind='cn'):
+    """当前应使用的版本号：探测缓存 → max(本机线索, 代码内置默认)。
+
+    国服与海外服同步更新，共用同一个版本号，kind 只用于区分缓存键。
+    缓存优先，因为它是确实被服务器接受过的值；本机线索与内置默认取较新者 ——
+    启动器日志可能停在更新前（例如日志里还写着 3.2.0.0，而游戏已是 3.3.0），
+    单看日志会拿旧版本去握手，必然 10012。
     """
-    from .sign import GAME_VERSION, GAME_VERSION_ABROAD
-    if kind == 'cn':
-        return cached(kind) or detect_local() or GAME_VERSION
-    return cached(kind) or GAME_VERSION_ABROAD
+    from .sign import GAME_VERSION
+    hit = cached(kind) or cached('cn')
+    if hit:
+        return hit
+    return _newer(detect_local(), GAME_VERSION)
 
 
 def candidates(base):
@@ -153,11 +176,15 @@ def _err_of(exc):
     return int(m.group(1)) if m else None
 
 
-def probe(host, port, make_session, base, kind='cn', extra='', gap=2.0, verbose=True):
+def probe(host, port, make_session, base, kind='cn', extra='', gap=2.0, verbose=True,
+          stop_on_timeout=False):
     """逐个候选版本试握手，返回 (已登录的 client, 命中版本, ConnectS2C)。
 
     make_session() 每次须返回新的 (票, 设备号)：票（authorize_code）一次性，
     每次试探都要重新换一张。kind 为 'cn' 走 login_china，'abroad' 走 login_abroad。
+
+    stop_on_timeout：握手一个包都收不到（超时）时直接停止探测。海外服对连续
+    握手限流比国服严格，静默丢包就是限流的表现 —— 继续试只会更难恢复。
     """
     from . import client as C
 
@@ -213,6 +240,10 @@ def probe(host, port, make_session, base, kind='cn', extra='', gap=2.0, verbose=
             # 取不到错误码（超时等）：不能据此判定版本正确
             if verbose:
                 print('[client_ver] 版本 %s 尝试失败：%s' % (ver, str(e)[:70]))
+            if stop_on_timeout:
+                if verbose:
+                    print('[client_ver] 握手无回应（疑似限流），停止探测以免更糟')
+                return None, None, None
             time.sleep(gap)
 
     if verbose:

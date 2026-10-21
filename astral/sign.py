@@ -29,8 +29,9 @@ APP_ID = '110001933'      # 国服 PC
 GAME_ID = '120000182'
 CHANNEL_ID = '110001933'
 OS = 'windows'
-GAME_VERSION = '3.3.0'          # 国服客户端版本。服务器会校验，不匹配返回 ClientVerErr(10012)。
-GAME_VERSION_ABROAD = '3.2.0'   # 海外服客户端版本。海外服更新滞后于国服，与国服分开维护。
+GAME_VERSION = '3.3.0'          # 客户端版本。国服与海外服同步更新，两服共用这一个值。
+                                # 服务器会校验，不匹配返回 ClientVerErr(10012)。
+GAME_VERSION_ABROAD = GAME_VERSION   # 兼容旧引用：海外服不再单独维护版本号（两服同步更新）
 SDK_VERSION = '1.0.0.9'     # 飞墨 SDK 版本（/api/init 必需）
 
 UA = {
