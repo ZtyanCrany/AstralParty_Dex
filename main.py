@@ -1539,7 +1539,7 @@ class Api:
         """首屏头像提取进度：running / ready（已可用角色）/ done。"""
         return dict(PRIO_STATE)
 
-    # ── 皮肤立绘 ─────────────────────────────────────────────
+    # ── 皮肤立绘（beta 实验）──────────────────────────────────
     def bust_index(self, start=False):
         """立绘索引状态；start=True 时在后台开始建（首次全量约 2~3 分钟）。
 
@@ -1551,15 +1551,17 @@ class Api:
             ready = gameart.bust_index_ready()
         except Exception:
             pass
-        if not ready and start and not BUST_STATE['building']:
-            BUST_STATE.update(building=True, done=0, total=0, err='')
-            threading.Thread(target=_bust_build, daemon=True).start()
         stale = False
         try:
             stale = gameart.bust_index_stale()
         except Exception:
             pass
-        return {'ready': ready, 'stale': stale, 'building': BUST_STATE['building'],
+        # 索引过期同样要重建：游戏更新、新增/更换客户端、移动安装位置都会改变包文件名，
+        # 沿用旧索引会逐条解析失败（界面表现为「本机游戏资源里没找到这张立绘」）。
+        if (not ready or stale) and start and not BUST_STATE['building']:
+            BUST_STATE.update(building=True, done=0, total=0, err='')
+            threading.Thread(target=_bust_build, daemon=True).start()
+        return {'ready': ready, 'stale': stale or BUST_STATE['building'], 'building': BUST_STATE['building'],
                 'done': BUST_STATE['done'], 'total': BUST_STATE['total'],
                 'count': BUST_STATE['count'], 'err': BUST_STATE['err']}
 
@@ -1581,7 +1583,7 @@ class Api:
             except Exception:
                 pass
             return {'ok': False, 'need_index': need, 'need_rebuild': stale,
-                    'msg': ('游戏更新过了，立绘索引要重建（约 2~3 分钟）' if stale
+                    'msg': ('游戏更新过、或换过客户端，立绘索引要重建（约 2~5 分钟）' if stale
                             else '本机游戏资源里没找到这张立绘')}
         try:
             import base64
@@ -1593,7 +1595,7 @@ class Api:
 
     # ── 索引 / 回放号 统一解析（复盘查询要用回放号，原「最近对局」用下标）──
     def skin_art(self, hero_id, seq=1):
-        """一套皮肤的全部图：左立绘 + 右两张进战 CG，返回 data URI。"""
+        """一套皮肤的全部图（beta）：左立绘 + 右两张进战 CG，返回 data URI。"""
         from astral import gameart
         try:
             art = gameart.skin_art(int(hero_id), int(seq))

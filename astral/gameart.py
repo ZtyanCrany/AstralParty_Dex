@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -91,9 +92,16 @@ def _region_pref() -> str:
 def find_cache(prefer: str = ''):
     """游戏热更新缓存目录（catalog_*.json 与 AssetBundles 所在处）。找不到返回 None。
 
-    两个区服各有自己的缓存，内容并不相同（海外版包更多），所以优先取 prefer
-    指定的那个，默认取当前登录区服；指定的没有就退回另一个 —— 机器上只装了
-    其中一版时同样可用。
+    三个产品名各有一份缓存，内容并不相同，所以优先取 prefer 指定的，
+    默认取当前登录区服；指定的没有就按 国服 → 国际服 → 渠道 依次退回
+    —— 机器上只装了其中一版时同样可用。
+
+        AstralParty_CN   Steam 国服
+        AstralParty_INT  Steam 国际服
+        吉星派对          B站 / TapTap 等国内渠道客户端（产物名是中文）
+
+    最后还有一层兜底：`feimo/*/com.unity.addressables` 里挑一个带 catalog 的，
+    这样以后新增渠道不改代码也能认到。
     """
     bases = []
     up = os.environ.get('USERPROFILE')
@@ -103,17 +111,39 @@ def find_cache(prefer: str = ''):
     if la:
         bases.append(Path(la).parent / 'LocalLow')
     got = {}
-    for who, name in (('cn', 'AstralParty_CN'), ('intl', 'AstralParty_INT')):
+    seen = set()
+    for who, name in (('cn', 'AstralParty_CN'), ('intl', 'AstralParty_INT'), ('chan', '吉星派对')):
         for b in bases:
             c = b / 'feimo' / name / 'com.unity.addressables'
             try:
                 if (c / 'AssetBundles').is_dir() or next(c.glob('catalog_*.json'), None):
                     got[who] = c
+                    try:
+                        seen.add(os.path.normcase(os.path.abspath(str(c))))
+                    except Exception:
+                        pass
                     break
             except Exception:
                 continue
+    # 兜底：任意产品名（新渠道 / 改名）
+    for b in bases:
+        try:
+            for c in (b / 'feimo').glob('*/com.unity.addressables'):
+                k = os.path.normcase(os.path.abspath(str(c)))
+                if k in seen:
+                    continue
+                if (c / 'AssetBundles').is_dir() or next(c.glob('catalog_*.json'), None):
+                    got.setdefault('other', c)
+                    seen.add(k)
+                    break
+        except Exception:
+            continue
     want = prefer or _region_pref()
-    return got.get(want) or got.get('cn') or got.get('intl')
+    order = (want, 'cn', 'intl', 'chan', 'other')
+    for k in order:
+        if got.get(k):
+            return got[k]
+    return None
 
 
 # ══════════════════ 皮肤立绘变体（用于判定「有没有羁绊皮肤」）══════════════════
@@ -218,18 +248,77 @@ def _steam_roots():
     return roots
 
 
+_LOG_RE = re.compile(r'Loading player data from (.+?)/data\.unity3d')
+
+
+def _installs_from_logs():
+    """从各客户端的 Player.log 反查真实安装目录。
+
+    Unity 启动必写一行：
+        Loading player data from <安装目录>/吉星派对_Data/data.unity3d
+    取这一行的父目录（= `<安装>/<产物名>_Data`），再拼 StreamingAssets/aa/StandaloneWindows64。
+    好处：不管装在哪个盘、是不是 Steam 库、渠道客户端叫什么名字，只要启动过一次就能认到。
+    """
+    out = []
+    bases = []
+    up = os.environ.get('USERPROFILE')
+    if up:
+        bases.append(Path(up) / 'AppData/LocalLow')
+    la = os.environ.get('LOCALAPPDATA')
+    if la:
+        bases.append(Path(la).parent / 'LocalLow')
+    prods, seen_prod = [], set()
+    for b in bases:                      # 两个 LocalLow 基路径可能指向同一处 → 去重
+        try:
+            for x in (b / 'feimo').iterdir():
+                k = os.path.normcase(os.path.abspath(str(x)))
+                if x.is_dir() and k not in seen_prod:
+                    seen_prod.add(k)
+                    prods.append(x)
+        except Exception:
+            continue
+    seen_dir = set()
+    for d in prods:
+        got = None
+        for name in ('Player.log', 'Player-prev.log'):
+            log = d / name
+            try:
+                if not log.is_file():
+                    continue
+                txt = log.read_text(encoding='utf-8', errors='ignore')
+            except Exception:
+                continue
+            for m in _LOG_RE.finditer(txt):
+                aa = Path(m.group(1)) / 'StreamingAssets' / 'aa' / 'StandaloneWindows64'
+                if aa.is_dir():
+                    got = aa
+                    break
+            if got:
+                break
+        if got:
+            k = os.path.normcase(os.path.abspath(str(got)))
+            if k not in seen_dir:
+                seen_dir.add(k)
+                out.append(got)
+    return out
+
+
 def find_installs(hint=None):
-    """安装目录里的基础资源包目录（StandaloneWindows64）。找不到返回 []。
+    r"""安装目录里的基础资源包目录（StandaloneWindows64）。找不到返回 []。
+
+    三条来源，合起来去重：
+      ① Steam 库：`<库>/steamapps/common/Astral Party/*/*_Data/StreamingAssets/aa/StandaloneWindows64`
+         （注册表 SteamPath + libraryfolders.vdf 里登记的库）
+      ② 各客户端 Player.log 反查（**B站 / TapTap 这类渠道客户端只能靠这条**，
+         它们装在 `.../bilibili Game/AstralParty/AstralParty Game/吉星派对_Data/...` 这种非 Steam 路径）
+      ③ 手写兜底 `userdata/assets/_gamepath.txt`：第一行写 Steam 库根目录，
+         或**直接写含 *.bundle 的那层目录**（绿色版 / 装在奇怪位置的人用）
 
     两点注意：
-      ① 同一目录会以不同大小写出现（注册表给 `d:\\St\\Steam`、libraryfolders 给 `D:\\St\\Steam`）
-         → 不按大小写归一会把同一个库扫描两遍，耗时翻倍；
-      ② 机器上可能同时装着国服（AstralParty_CN）与国际服（AstralParty_INT）
-         → 优先取当前登录区服的那份，没有就退回另一份。
-
-    兜底：`userdata/assets/_gamepath.txt` 第一行可手写 Steam 库根目录
-    （如 `D:\\St\\Steam`）或**直接写资源包目录**（含 *.bundle 的那层），
-    供「装在非注册表 Steam 库 / 绿色版」的用户使用。
+      · 同一目录会以不同大小写出现（注册表与 libraryfolders 给出的大小写可能不一致）
+        → 不按大小写归一会把同一个库扫描两遍，耗时翻倍；
+      · 机器上可能同时装着国服 / 国际服 / 渠道版 → 优先取当前登录区服那份，
+        没有就退回全部，保证「只装了一个版本」的机器也能扫到。
     """
     if not hint:
         hp = paths.DATA_DIR / 'assets' / '_gamepath.txt'
@@ -245,18 +334,85 @@ def find_installs(hint=None):
     roots = [Path(hint)] if hint else []
     roots += _steam_roots()
     all_dirs, seen = [], set()
+
+    def _add(d):
+        try:
+            key = os.path.normcase(os.path.abspath(str(d)))
+        except Exception:
+            return
+        if d.is_dir() and key not in seen:
+            seen.add(key)
+            all_dirs.append(d)
+
     for r in roots:
         try:
             for aa in r.glob('steamapps/common/Astral Party/*/*_Data/StreamingAssets/aa/StandaloneWindows64'):
-                key = os.path.normcase(os.path.abspath(str(aa)))       # 大小写归一
-                if aa.is_dir() and key not in seen:
-                    seen.add(key)
-                    all_dirs.append(aa)
+                _add(aa)
         except Exception:
             continue
+    for aa in _installs_from_logs():
+        _add(aa)
     want = 'AstralParty_INT_Data' if _region_pref() == 'intl' else 'AstralParty_CN_Data'
     mine = [d for d in all_dirs if d.parents[2].name.endswith(want)]
     return mine or all_dirs
+
+
+def all_installs():
+    """**所有**客户端的资源包目录（去重；当前区服那份排最前）。
+
+    与 find_installs() 的区别：后者按当前区服选择一份，本函数返回全部。
+    立绘索引必须覆盖全部客户端：不同客户端的包文件名是不同哈希（Steam 索引中约
+    四成的包名在渠道客户端里不存在），只建一份会导致换客户端后取不到图。
+    """
+    dirs, seen = [], set()
+
+    def add(d):
+        try:
+            k = os.path.normcase(os.path.abspath(str(d)))
+        except Exception:
+            return
+        if d.is_dir() and k not in seen:
+            seen.add(k)
+            dirs.append(d)
+
+    for d in find_installs():                     # 当前区服优先
+        add(d)
+    for d in _installs_from_logs():               # 渠道 / 非注册表 Steam 库
+        add(d)
+    for r in _steam_roots():
+        try:
+            for aa in r.glob('steamapps/common/Astral Party/*/*_Data/StreamingAssets/aa/StandaloneWindows64'):
+                add(aa)
+        except Exception:
+            continue
+    return dirs
+
+
+_SIG_CACHE = {}
+
+
+def install_sig():
+    """当前机器「有哪些资源包」的指纹：(sha1 前16位, 包数)。
+
+    作用：索引里存一份，加载时比对。装了新客户端、游戏更新加了包、换了安装位置，
+    指纹就变 → 判定索引过期并重建。单客户端机器只多花 ~0.2 秒算指纹。
+    """
+    if _SIG_CACHE.get('v'):
+        return _SIG_CACHE['v']
+    names = []
+    for d in all_installs():
+        try:
+            names += [f.name for f in d.glob('*.bundle')]
+        except Exception:
+            continue
+        try:
+            names += [f.name for f in d.rglob('__data')]
+        except Exception:
+            continue
+    names.sort()
+    v = (hashlib.sha1('\n'.join(names).encode('utf-8')).hexdigest()[:16], len(names))
+    _SIG_CACHE['v'] = v
+    return v
 
 
 def bundle_files(cache=None, installs=None):
@@ -686,7 +842,7 @@ def selftest():
 #     UT_Hero_Bust_<角色ID>_0        初始皮肤（另有 _1 差分）
 #     UT_Hero_Bust_<角色ID>_Max_0    羁绊皮肤
 #     UT_Hero_Bust_<角色ID>_01_0     名皮 1（_02_0 = 名皮 2 …）
-#   这些图**只在安装目录的冷包**里（6000+ 个 .bundle），热更包里没有。
+#   这些图只存在于安装目录的冷包（数千个 .bundle），热更包里没有。
 #   全量扫一次约 2~3 分钟，所以建一份「资源名 → 包路径」的索引缓存，
 #   之后按需只读那一个包（几十毫秒）。索引随 catalog 版本失效重建。
 BUST_PREFIX = 'UT_Hero_Bust_'
@@ -729,10 +885,24 @@ def _current_catalog() -> str:
 
 
 def bust_index_stale() -> bool:
-    """索引是不是这一版游戏建的（游戏更新后包名会变，必须重建）。"""
+    """索引还能不能用。三种情况要重建：
+
+      ① catalog 版本变了（游戏更新）；
+      ② 机器上的包集合变了（新装了另一个客户端 / 换安装位置 / 更新后新增包）——
+         包名是内容哈希，不同客户端并不通用，所以必须按「本机现有包」重建；
+      ③ 老索引没有指纹（包括早期随包发出去的那份）→ 按本机情况重扫一次。
+    """
     idx = _load_bust_index()
     cat = _current_catalog()
-    return bool(cat and idx.get('catalog') and idx['catalog'] != cat)
+    if cat and idx.get('catalog') and idx['catalog'] != cat:
+        return True
+    sig = idx.get('sig')
+    if not sig:
+        return True
+    try:
+        return sig != install_sig()[0]
+    except Exception:
+        return False
 
 
 _BUNDLE_PATHS: dict = {}
@@ -744,7 +914,7 @@ def _bundle_path_map() -> dict:
     if _BUNDLE_PATHS:
         return _BUNDLE_PATHS
     out = {}
-    for d in find_installs() or []:
+    for d in all_installs() or []:                 # 索引按全部客户端建立，路径表需同样覆盖
         try:
             for f in Path(d).glob('*.bundle'):
                 out.setdefault(f.name, str(f))
@@ -775,7 +945,8 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
     只在游戏更新（catalog 版本变了）或索引缺失时需要跑；约 2~3 分钟。
     """
     cache = find_cache()
-    files = [str(p) for p, _ in bundle_files(cache, find_installs())]
+    installs = all_installs()                     # 扫描全部客户端安装目录
+    files = [str(p) for p, _ in bundle_files(cache, installs)]
     hits: dict = {}
     done = 0
     from concurrent.futures import ProcessPoolExecutor
@@ -789,7 +960,8 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
                     on_progress(done, len(files))
                 except Exception:
                     pass
-    data = {'catalog': _current_catalog(), 'map': hits,
+    sig, n = install_sig()
+    data = {'catalog': _current_catalog(), 'map': hits, 'sig': sig, 'packs': n,
             'built_at': time.strftime('%Y-%m-%d %H:%M:%S')}
     try:
         p = _bust_index_file()

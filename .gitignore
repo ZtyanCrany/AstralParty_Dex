@@ -41,5 +41,8 @@ tools/_legacy/
 # 游戏原文缓存：由 tools/fetch_game_texts.py 从本机游戏重生成，不随仓库分发
 assets/data/game_texts.json
 
-# 打包产物目录
+# 打包临时产物（正在运行的包会锁住 dist，打包时用 APDEX_DIST 指到别处）
+dist_beta4/
 dist_*/
+# 按本机客户端现场生成，不进仓库、也不随包发
+assets/data/bust_index.json

@@ -1707,7 +1707,7 @@ function afterLogin(profile){
   const nl = document.getElementById('navLogin'); if(nl) nl.style.display='none';
   const lo = document.getElementById('btnLogout'); if(lo) lo.style.display='block';
   // 先把文字画出来（皮肤/对局/统计都不依赖头像），头像再慢慢补 ——
-  // 之前是先 await loadAvatars() 才 render，美术资源没解完整页空着，体验很差。
+  // 文字内容不依赖头像，先渲染；头像解出后再补一次，避免首屏空着。
   render(profile);
   setTimeout(()=>nav('profile'), 250);
   loadAvatars().then(()=>{ try{ if(window.__profile) render(window.__profile); }catch(e){} });
@@ -2119,7 +2119,7 @@ function renderSkins(d){
   syncStabThumb();
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
-// ── 皮肤立绘大图（beta）：首次要先建索引（扫冷包，2~3 分钟）──
+// ── 皮肤立绘大图（beta）：首次要先建索引（扫冷包，Steam 2~3 分钟 / 渠道版 3~5 分钟）──
 window.__bustCache = window.__bustCache || {};
 window.openBust = async (el) => {
   const hid = Number(el.dataset.hid || 0);
@@ -2169,9 +2169,11 @@ window.openBust = async (el) => {
   try{
     let idx = await window.pywebview.api.bust_index(true);
     const t0 = Date.now();
-    while(!idx.ready && idx.building && Date.now() - t0 < 300000){
+    while((!idx.ready || idx.stale) && idx.building && Date.now() - t0 < 300000){
       const tot = idx.total ? ('/' + idx.total) : '';
-      st.textContent = '首次使用要先扫一遍本机游戏资源（约 2~3 分钟，只需一次）：'
+      st.textContent = (idx.ready
+           ? '客户端有变化，正在重建立绘索引（约 2~5 分钟）：'
+           : '首次使用要先扫一遍本机游戏资源（Steam 版约 2~3 分钟、渠道版约 3~5 分钟，只需一次）：')
                      + (idx.done || 0) + tot + ' 个包';
       await new Promise(r => setTimeout(r, 1500));
       idx = await window.pywebview.api.bust_index(false);
