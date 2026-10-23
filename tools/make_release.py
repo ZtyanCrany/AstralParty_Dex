@@ -11,12 +11,13 @@
 """
 import re
 import shutil
+import os
 import sys
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DIST = ROOT / 'dist' / '星趴档案'
+DIST = Path(os.environ['APDEX_DIST']) if os.environ.get('APDEX_DIST') else ROOT / 'dist' / '星趴档案'
 BANNED = ('userdata/', 'token.json', '_capture', '.hermes')
 # 美术资源（角色头像 / 立绘头像）不进包：改为运行时从本机游戏资源包提取
 #   （astral/gameart.py）—— 这样游戏出新角色/新皮肤才跟得上，且软件包不分发官方美术资源。

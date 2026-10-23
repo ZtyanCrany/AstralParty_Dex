@@ -40,3 +40,6 @@ tools/_legacy/
 
 # 游戏原文缓存：由 tools/fetch_game_texts.py 从本机游戏重生成，不随仓库分发
 assets/data/game_texts.json
+
+# 打包产物目录
+dist_*/

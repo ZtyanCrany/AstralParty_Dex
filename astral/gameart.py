@@ -31,6 +31,7 @@ import time
 from pathlib import Path
 
 from . import paths
+from .paths import data_file
 
 PREFIX_AV = 'UT_Platform_'                  # 角色头像（注意同前缀还有地图图标：Start/Shop/...）
 PREFIX_PH = 'UT_Hero_ProfilePhoto_'         # 角色立绘头像（含皮肤）
@@ -678,3 +679,244 @@ def selftest():
         log('  扫描环境 失败\n' + traceback.format_exc())
     log('=== selftest 结束 ｜ 问题: %s ===' % (bad or '无'))
     return bad
+
+
+# ══════════════════ 皮肤立绘（Bust 1568×900）══════════════════
+#   资源名规律（客户端 3.3.0 实测）：
+#     UT_Hero_Bust_<角色ID>_0        初始皮肤（另有 _1 差分）
+#     UT_Hero_Bust_<角色ID>_Max_0    羁绊皮肤
+#     UT_Hero_Bust_<角色ID>_01_0     名皮 1（_02_0 = 名皮 2 …）
+#   这些图**只在安装目录的冷包**里（6000+ 个 .bundle），热更包里没有。
+#   全量扫一次约 2~3 分钟，所以建一份「资源名 → 包路径」的索引缓存，
+#   之后按需只读那一个包（几十毫秒）。索引随 catalog 版本失效重建。
+BUST_PREFIX = 'UT_Hero_Bust_'
+CARD_PREFIX = 'UT_Hero_Card'   # 角色卡面立绘（含 Card2 变体）
+BUST_WIDTH = 1100
+CARD_WIDTH = 820                   # 预览宽度（原生 1568×900，缩到 1280 约 400KB）
+
+
+def busts_dir() -> Path:
+    return paths.DATA_DIR / 'assets' / 'busts'
+
+
+def _bust_index_file() -> Path:
+    return paths.DATA_DIR / 'assets' / 'bust_index.json'
+
+
+def _load_bust_index() -> dict:
+    """索引：{资源名: 资源包文件名}。只存文件名，换机器也能用。"""
+    for p in (_bust_index_file(), None):
+        path = p or data_file('bust_index.json')
+        try:
+            d = json.loads(Path(path).read_text(encoding='utf-8'))
+            if isinstance(d, dict) and isinstance(d.get('map'), dict) and d['map']:
+                return d
+        except Exception:
+            continue
+    return {'catalog': '', 'map': {}}
+
+
+def bust_index_ready() -> bool:
+    return bool(_load_bust_index().get('map'))
+
+
+def _current_catalog() -> str:
+    try:
+        cats = sorted((find_cache() or Path('.')).glob('catalog_*.json'))
+        return cats[-1].name if cats else ''
+    except Exception:
+        return ''
+
+
+def bust_index_stale() -> bool:
+    """索引是不是这一版游戏建的（游戏更新后包名会变，必须重建）。"""
+    idx = _load_bust_index()
+    cat = _current_catalog()
+    return bool(cat and idx.get('catalog') and idx['catalog'] != cat)
+
+
+_BUNDLE_PATHS: dict = {}
+
+
+def _bundle_path_map() -> dict:
+    """资源包文件名 → 绝对路径（安装目录里的 .bundle，按名字索引）。"""
+    global _BUNDLE_PATHS
+    if _BUNDLE_PATHS:
+        return _BUNDLE_PATHS
+    out = {}
+    for d in find_installs() or []:
+        try:
+            for f in Path(d).glob('*.bundle'):
+                out.setdefault(f.name, str(f))
+        except Exception:
+            continue
+    _BUNDLE_PATHS = out
+    return out
+
+
+def _bust_scan_one(path: str) -> dict:
+    """子进程入口：一个包里所有 Bust 资源名 → 包文件名（必须是模块级函数）。"""
+    out = {}
+    try:
+        import UnityPy
+        env = UnityPy.load(path)
+    except Exception:
+        return out
+    name = Path(path).name
+    for k, _d in bundle_textures(env):
+        if k.startswith(BUST_PREFIX) or k.startswith(CARD_PREFIX):
+            out[k] = name
+    return out
+
+
+def build_bust_index(on_progress=None, workers: int = 8) -> dict:
+    """全量扫一遍资源包，建「资源名 → 包文件名」索引。
+
+    只在游戏更新（catalog 版本变了）或索引缺失时需要跑；约 2~3 分钟。
+    """
+    cache = find_cache()
+    files = [str(p) for p, _ in bundle_files(cache, find_installs())]
+    hits: dict = {}
+    done = 0
+    from concurrent.futures import ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        for res in ex.map(_bust_scan_one, files, chunksize=8):
+            done += 1
+            if res:
+                hits.update(res)
+            if on_progress and (done % 200 == 0 or done == len(files)):
+                try:
+                    on_progress(done, len(files))
+                except Exception:
+                    pass
+    data = {'catalog': _current_catalog(), 'map': hits,
+            'built_at': time.strftime('%Y-%m-%d %H:%M:%S')}
+    try:
+        p = _bust_index_file()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+    except Exception:
+        pass
+    return data
+
+
+def bust_key(hero_id, seq: int = 1, has_bond: bool = True) -> str:
+    """皮肤槽位 → 资源名。
+
+    seq：1 = 初始皮肤，2 = 羁绊（只有带 _Max 立绘的角色才有），3+ = 名皮。
+    联动角色没有羁绊立绘，名皮从 2 起 —— 调用方用 has_bond 告诉这里。
+    """
+    hid = int(hero_id or 0)
+    s = int(seq or 1)
+    if s <= 1:
+        return '%s%d_0' % (BUST_PREFIX, hid)
+    if s == 2 and has_bond:
+        return '%s%d_Max_0' % (BUST_PREFIX, hid)
+    named = s - (2 if has_bond else 1)
+    return '%s%d_%02d_0' % (BUST_PREFIX, hid, max(named, 1))
+
+
+def card_key(hero_id, seq: int = 1, has_bond: bool = True) -> str:
+    """卡面立绘资源名：UT_Hero_Card_<角色ID>[ _Max | _01 | _02 ... ]。"""
+    hid = int(hero_id or 0)
+    s = int(seq or 1)
+    if s <= 1:
+        return '%s_%d' % (CARD_PREFIX, hid)
+    if s == 2 and has_bond:
+        return '%s_%d_Max' % (CARD_PREFIX, hid)
+    return '%s_%d_%02d' % (CARD_PREFIX, hid, max(s - (2 if has_bond else 1), 1))
+
+
+def _render(key: str, bundle: str, width: int):
+    """从一个资源包里取出指定名字的贴图 → PNG（按 key 缓存）。"""
+    out = busts_dir() / (key + '.png')
+    try:
+        if out.exists() and out.stat().st_size > 0:
+            return out
+    except OSError:
+        pass
+    path = _bundle_path_map().get(Path(bundle).name)
+    if not path:
+        return None
+    try:
+        import UnityPy
+        from PIL import Image
+        env = UnityPy.load(path)
+        for name, d in bundle_textures(env):
+            if name != key:
+                continue
+            im = d.image
+            if im is None:
+                continue
+            if im.width > width:
+                im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            tmp = out.with_name(out.name + '.tmp')
+            im.save(tmp, format='PNG')
+            os.replace(tmp, out)
+            return out
+    except Exception:
+        pass
+    return None
+
+
+def _pick(m, key, *fallbacks):
+    """在索引里挑一个存在的键（先精确，再回退）。"""
+    for k in (key, *fallbacks):
+        if k and k in m:
+            return k
+    return None
+
+
+def _bonded(m, prefix, hid) -> bool:
+    """索引里有没有这一档变体（_Max / _Max_0 / _Max_1 / _Max_2 …）。
+
+    实测命名并不统一：ProfilePhoto 是 `_Max`，Bust 是 `_Max_0/_1`，
+    Card 在 Z3000 这一类上是 `_Max_2`。只认精确 `_Max` 会漏判，
+    漏判会让「羁绊」错拿到 `_01`（名皮）、后面的名皮再整体错位。
+    """
+    head = '%s_%d_Max' % (prefix.rstrip('_'), int(hid or 0))
+    return any(k == head or k.startswith(head + '_') for k in m)
+
+
+def bust_png(hero_id, seq: int = 1, width: int = BUST_WIDTH, variant: int = 0):
+    """进战 CG：每个皮肤两张（_0 / _1），variant 选哪张。"""
+    m = (_load_bust_index().get('map') or {})
+    hid = int(hero_id or 0)
+    has_bond = _bonded(m, BUST_PREFIX, hid)
+    base = bust_key(hid, seq, has_bond)
+    stem, _, tail = base.rpartition('_')          # ..._01 + '0'
+    alt = stem + '_1'
+    order = (base, alt) if variant == 0 else (alt, base)
+    key = _pick(m, *order, '%s%d_0' % (BUST_PREFIX, hid))
+    if not key:
+        return None
+    return _render(key, m[key], width)
+
+
+def card_png(hero_id, seq: int = 1, width: int = CARD_WIDTH):
+    """角色卡面立绘：优先精确的皮肤卡，再回退初始卡。"""
+    m = (_load_bust_index().get('map') or {})
+    hid = int(hero_id or 0)
+    has_bond = _bonded(m, CARD_PREFIX, hid)
+    base = '%s_%d' % (CARD_PREFIX, hid)
+    s_ = max(int(seq or 1), 1)
+    if s_ <= 1:
+        cands = [base]
+    elif s_ == 2 and has_bond:
+        cands = [base + '_Max', base + '_Max_0', base + '_Max_1',
+                 base + '_Max_2', base + '_Max_3']
+    else:
+        n = max(s_ - (2 if has_bond else 1), 1)
+        cands = ['%s_%02d' % (base, n), '%s_%d' % (base, n)]
+    key = _pick(m, *cands, base)                   # 都找不到才退初始卡面
+    if not key:
+        return None
+    return _render(key, m[key], width)
+
+
+def skin_art(hero_id, seq: int = 1) -> dict:
+    """一套皮肤的完整物料：左立绘 + 右两张进战 CG。返回 {card, cg0, cg1}（路径）。"""
+    return {'card': card_png(hero_id, seq),
+            'cg0': bust_png(hero_id, seq, variant=0),
+            'cg1': bust_png(hero_id, seq, variant=1)}

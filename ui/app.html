@@ -1059,6 +1059,68 @@
     --sh10:rgba(0,0,0,0.093);
     --sh11:rgba(0,0,0,0.248);
   }
+
+  /* ── 皮肤立绘弹窗 ── */
+  .bust{ position:fixed; inset:0; z-index:150; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; gap:10px; padding:24px;
+         background:var(--sh8); transition:opacity .18s; }
+  .bust.hide{ opacity:0; pointer-events:none; }
+  .bustbody{ display:flex; align-items:center; justify-content:center; gap:16px; max-width:94vw; }
+  /* 背景层：卡面自身放大模糊后铺满，透明区域不露纯色底 */
+  /* 纸白：半透明米白，底部界面隐约透出来 */
+  .bust{ background:rgba(240,238,230,.68);
+         -webkit-backdrop-filter:blur(11px) saturate(1.05); backdrop-filter:blur(11px) saturate(1.05); }
+  .bust .bustbg{ position:absolute; inset:-10%; background-size:cover; background-position:center;
+                 filter:blur(72px) saturate(1.2); opacity:.10;
+                 transform:scale(1.1); pointer-events:none; }
+  .bust .bustbg::after{ content:''; position:absolute; inset:0;
+                        background:radial-gradient(120% 90% at 50% 45%, transparent 30%, rgba(8,7,6,.55) 100%); }
+  /* 透明图用 drop-shadow：沿剪影投影，空白处不再有方框阴影 */
+  .bustleft{ position:relative; display:flex; align-items:flex-end; justify-content:center; }
+  .bustleft img{ max-height:88vh; max-width:52vw; position:relative; z-index:1;
+                 filter:drop-shadow(0 16px 30px rgba(74,58,42,.26)) drop-shadow(0 3px 8px rgba(74,58,42,.16)); }
+  /* 接触阴影：立绘脚下压一团椭圆，制造「站在展台上」的落点 */
+  .bustleft .bustshade{ position:absolute; bottom:-1.2vh; left:50%; transform:translateX(-50%);
+                        width:min(34vw, 520px); height:7vh; z-index:0; pointer-events:none;
+                        opacity:0; transition:opacity .25s;
+                        background:radial-gradient(50% 50% at 50% 50%, rgba(74,58,42,.34), rgba(74,58,42,0) 72%);
+                        filter:blur(9px); }
+  .bustright{ display:flex; flex-direction:column; gap:14px; }
+  /* 相纸边框：用 border 画「环」，环是实心白纸、环内仍是透明（透出底图） */
+  .bustright .print{ margin:0; padding:0; background:transparent;
+                     border:8px solid #FDFCF8; border-radius:14px;
+                     box-shadow:0 10px 22px rgba(74,58,42,.10), 0 2px 6px rgba(74,58,42,.06); }
+  .bustright .print img{ display:block; max-height:31vh; max-width:47vw; border-radius:0;
+                         filter:drop-shadow(0 2px 6px rgba(74,58,42,.10)); }
+  /* 字幕：角色名与皮肤名分两行，左侧强调竖条 */
+  .bust .bcap{ display:flex; align-items:stretch; gap:10px; padding:6px 16px 7px 0;
+               border-radius:10px; background:rgba(18,16,14,.52);
+               border:1px solid rgba(255,255,255,.10);
+               box-shadow:0 8px 24px rgba(0,0,0,.26); backdrop-filter:blur(10px) saturate(1.05); }
+  .bust .bcap .bar{ width:3px; border-radius:0 2px 2px 0; background:var(--ac); }
+  .bust .bcap .txt{ display:flex; flex-direction:column; line-height:1.22; padding-left:1px; }
+  .bust .bcap .cn{ color:rgba(255,255,255,.55); font-size:10.5px; letter-spacing:.7px; }
+  .bust .bcap .sn{ color:#fff; font-size:14px; font-weight:700; letter-spacing:.3px; }
+  .bust .bst{ color:rgba(58,52,43,.55); font-size:12.5px; text-align:center; max-width:80vw; }
+  .bust .bx{ position:absolute; top:18px; right:22px; color:rgba(58,52,43,.55); font-size:20px;
+             cursor:pointer; opacity:.9; }
+  .bust .bx:hover{ opacity:1; }
+  /* 夜间：深色半透明玻璃 + 冷调细框，文字反白 */
+  [data-theme="dark"] .bust{ background:rgba(22,20,18,.70); }
+  [data-theme="dark"] .bust .bustbg{ opacity:.16; }
+  [data-theme="dark"] .bustleft img{ filter:drop-shadow(0 16px 30px rgba(0,0,0,.62)) drop-shadow(0 3px 8px rgba(0,0,0,.42)); }
+  [data-theme="dark"] .bustleft .bustshade{ background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.72), rgba(0,0,0,0) 72%); }
+  [data-theme="dark"] .bustright .print{ border-color:#2E2924;
+                                         box-shadow:0 10px 22px rgba(0,0,0,.42), 0 2px 6px rgba(0,0,0,.28); }
+  [data-theme="dark"] .bustright .print img{ filter:drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+  [data-theme="dark"] .bust .bcap{ background:rgba(255,255,255,.10);
+                                   border-color:rgba(255,255,255,.16);
+                                   box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  [data-theme="dark"] .bust .bcap .cn{ color:rgba(255,255,255,.60); }
+  [data-theme="dark"] .bust .bst,
+  [data-theme="dark"] .bust .bx{ color:rgba(240,238,230,.60); }
+  .chip.sk{ cursor:pointer; }
+  .chip.sk:hover{ filter:brightness(.97); transform:translateY(-1px); }
 </style>
 </head>
 <body>
@@ -1110,6 +1172,19 @@
     <div class="rvtabs" id="rvTabs"></div>
     <div class="rvbody" id="rvBody"></div>
   </div>
+</div>
+<div id="bust" class="bust hide" onclick="bustAway(event)">
+  <div class="bustbg" id="bustBg"></div>
+  <div class="bx" onclick="closeBust()">✕</div>
+  <div class="bustbody">
+    <div class="bustleft"><img id="artCard" alt="" style="display:none" /><i class="bustshade"></i></div>
+    <div class="bustright">
+      <figure class="print"><img id="artCg0" alt="" style="display:none" /></figure>
+      <figure class="print"><img id="artCg1" alt="" style="display:none" /></figure>
+    </div>
+  </div>
+  <div class="bcap" id="bustCap"></div>
+  <div class="bst" id="bustSt"></div>
 </div>
 <div id="boot" class="hide">
   <div class="bspin"></div>
@@ -1265,6 +1340,9 @@ function nav(p){
   $('#p-'+p).classList.add('on');
   const m = $('#main');
   if(m) m.scrollTop = 0;    // 与页签同理：切页回顶部。沿用上一页的滚动位会被夹回去，看着像跳一下
+  if(p === 'skin' && window.__profile){
+    try{ renderSkins(window.__profile); }catch(e){}
+  }
   syncNavInd();
   syncStabThumb();          // 面板刚显示出来才有尺寸，必须在这儿补算
 }
@@ -1541,7 +1619,11 @@ function afterLogin(profile){
   unlock();
   const nl = document.getElementById('navLogin'); if(nl) nl.style.display='none';
   const lo = document.getElementById('btnLogout'); if(lo) lo.style.display='block';
-  return loadAvatars().then(()=>{ render(profile); setTimeout(()=>nav('profile'), 250); });
+  // 文字内容不依赖头像，先渲染；头像解出后再补一次，避免首屏空着。
+  render(profile);
+  setTimeout(()=>nav('profile'), 250);
+  loadAvatars().then(()=>{ try{ if(window.__profile) render(window.__profile); }catch(e){} });
+  return;
 }
 
 // ── ★ 角色头像：从后端拿 data URL（不走 file://，WebView2 下也能显示）──
@@ -1940,7 +2022,7 @@ function renderSkins(d){
   box.innerHTML = rows.map(h=>
     `<div class="skrow${h.owns===false?' noh':''}">
       <div class="skhead"><b>${h.name}</b><i>${h.title||''}</i>${h.contract?'<u class="ctr">已婚</u>':''}<em>${h.have}/${h.total}</em></div>
-      <div class="chips">${h.skins.map(x=>`<span class="chip${x.has?' on':''}">${x.name}</span>`).join('') || '<span class="empty">（Wiki 无记录）</span>'}</div>
+      <div class="chips">${h.skins.map(x=>`<span class="chip sk${x.has?' on':''}" data-hid="${h.id}" data-seq="${x.seq||1}" data-nm="${window.__esc(x.name)}" data-hero="${window.__esc(h.name)}" onclick="openBust(this)" title="${x.has?'点开看立绘大图':'未拥有（也可预览）'}">${x.name}</span>`).join('') || '<span class="empty">（Wiki 无记录）</span>'}</div>
     </div>`).join('');
   ['id','have','total'].forEach(k => {
     const t = document.getElementById('skb_' + k);
@@ -1949,6 +2031,89 @@ function renderSkins(d){
   syncStabThumb();
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
+// ── 皮肤立绘大图：首次需要建立资源索引（扫描安装目录的冷包）──
+window.__bustCache = window.__bustCache || {};
+window.openBust = async (el) => {
+  const hid = Number(el.dataset.hid || 0);
+  const seq = Number(el.dataset.seq || 1);
+  const nm  = el.dataset.nm || '';
+  const hero = el.dataset.hero || '';
+  const box = document.getElementById('bust');
+  const cap = document.getElementById('bustCap');
+  const st  = document.getElementById('bustSt');
+  const imgs = {card: document.getElementById('artCard'),
+                cg0:  document.getElementById('artCg0'),
+                cg1:  document.getElementById('artCg1')};
+  box.classList.remove('hide');
+  const _e = window.__esc || (v => String(v == null ? '' : v));
+  cap.innerHTML = '<i class="bar"></i><div class="txt">'
+                + (hero ? '<span class="cn">' + _e(hero) + '</span>' : '')
+                + '<span class="sn">' + _e(nm) + '</span></div>';
+  st.textContent = '正在从本机游戏资源里取图…';
+  Object.values(imgs).forEach(i => { i.style.display = 'none'; i.removeAttribute('src'); });
+  document.querySelectorAll('.bustright .print').forEach(f => { f.style.display = 'none'; });
+  const shade = document.querySelector('.bustleft .bustshade');
+  if(shade) shade.style.opacity = '0';
+  const bg = document.getElementById('bustBg');
+  if(bg) bg.style.backgroundImage = '';
+
+  const key = 'art-' + hid + '-' + seq;
+  const paint = (data) => {
+    let n = 0;
+    const bg = document.getElementById('bustBg');
+    if(bg && data && (data.cg0 || data.card)) bg.style.backgroundImage = 'url("' + (data.cg0 || data.card) + '")';
+    for(const k of ['card', 'cg0', 'cg1']){
+      const url = data && data[k];
+      if(!url) continue;
+      imgs[k].onload = () => { imgs[k].style.display = 'block';
+                               const fr = imgs[k].closest('.print');
+                               if(fr) fr.style.display = 'block';
+                               if(k === 'card'){
+                                 const sh = document.querySelector('.bustleft .bustshade');
+                                 if(sh) sh.style.opacity = '1';
+                               }
+                               n++; if(n >= 3) st.textContent = ''; };
+      imgs[k].src = url;
+    }
+  };
+  if(window.__bustCache[key]){ paint(window.__bustCache[key]); return; }
+
+  try{
+    let idx = await window.pywebview.api.bust_index(true);
+    const t0 = Date.now();
+    while(!idx.ready && idx.building && Date.now() - t0 < 300000){
+      const tot = idx.total ? ('/' + idx.total) : '';
+      st.textContent = '首次使用要先扫一遍本机游戏资源（约 2~3 分钟，只需一次）：'
+                     + (idx.done || 0) + tot + ' 个包';
+      await new Promise(r => setTimeout(r, 1500));
+      idx = await window.pywebview.api.bust_index(false);
+    }
+    if(!idx.ready){
+      st.textContent = idx.err ? ('立绘索引建立失败：' + idx.err)
+                               : '这台机器上没找到游戏资源包（或游戏没安装）';
+      return;
+    }
+    const data = await window.pywebview.api.skin_art(hid, seq);
+    if(!data || !data.ok){
+      st.textContent = (data && data.msg) || '取图失败';
+      return;
+    }
+    window.__bustCache[key] = data;
+    paint(data);
+  }catch(e){
+    st.textContent = '取图出错：' + (e && e.message ? e.message : e);
+  }
+};
+window.closeBust = () => document.getElementById('bust').classList.add('hide');
+// 图片以外的任何地方（留白、缝隙、说明文字）都算「点击外面」→ 关闭
+window.bustAway = (e) => {
+  if(e.target && e.target.closest && e.target.closest('img')) return;
+  window.closeBust();
+};
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') window.closeBust();
+});
+
 function rgTag(region){                        // 区服标签：同一账号在两边是两套数据
   const r = region || ((window.__profile || {}).region) || 'cn';
   return '<span class="rgtag ' + (r === 'intl' ? 'ins' : 'cn') + '">'
@@ -2092,7 +2257,7 @@ function render(d){
 
   window.closeReview = () => document.getElementById('rv').classList.add('hide');
 
-  window.renderReview = (rv, uid) => {
+window.renderReview = (rv, uid) => {
     const esc = window.__esc;
     const SRC = {star:'升星', task:'任务完成', shop:'商店购买', cycle:'循环往复', unknown:'未知'};
     const p = (rv.players || []).find(x => String(x.uid) === String(uid));
@@ -2209,7 +2374,8 @@ function render(d){
     let html;
     if(S.tab === 'stats'){
       const c = S.stats;
-      html = '<div class="rvsec"><h4>轮次数据</h4>' + c.tab + '</div>' +
+      html = (c.score ? '<div class="rvsec"><h4>本局评分</h4>' + c.score + '</div>' : '') +
+             '<div class="rvsec"><h4>轮次数据</h4>' + c.tab + '</div>' +
              '<div class="rvsec"><h4>筹码总览（' + c.nchip + ' 个）</h4><div class="chips">' +
                c.chips + '</div></div>' +
              '<div class="rvsec"><h4>获取筹码明细</h4>' +

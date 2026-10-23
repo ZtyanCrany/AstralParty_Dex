@@ -9,15 +9,20 @@
     整个 dist/星趴档案 文件夹可以拷到任何地方运行（免管理员、免安装）
 """
 import subprocess
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# 产物输出目录，可用 APDEX_DIST 覆盖（默认为项目下的 dist）
+DIST_DIR = (Path(os.environ['APDEX_DIST']) if os.environ.get('APDEX_DIST')
+            else ROOT / 'dist' / '星趴档案')
 
 CMD = [
     sys.executable, '-m', 'PyInstaller',
     '--noconfirm', '--clean',
     '--name', '星趴档案',
+    '--distpath', str(DIST_DIR.parent),
     '--windowed',                      # 不弹控制台
     '--icon', str(ROOT / 'assets' / 'app.ico'),
     # 只读资源：界面 + 数据表 + 协议描述符
@@ -92,7 +97,7 @@ def main() -> int:
     if r.returncode != 0:
         print('✗ 打包失败')
         return r.returncode
-    out = ROOT / 'dist' / '星趴档案'
+    out = DIST_DIR
     # assets/data 是整目录打包的，但 game_texts.json 只是「同步工具用的原始汇总」：
     #   界面运行时只用各小表（cards/chips/buffs/monsters…），把它从产物里删掉，省 ~430KB，
     #   也不必让软件包带着整包游戏原文（要重生成跑 tools/fetch_game_texts.py）。

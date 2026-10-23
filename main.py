@@ -13,6 +13,7 @@ import platform
 import re
 import time
 import sys
+import base64
 import threading
 import urllib.request
 import webview
@@ -730,10 +731,10 @@ def build_skins(p):
         rows = []
         for _seq in sorted(set(slots) | set(has)):
             if _seq in slots:
-                rows.append({'name': slots[_seq],
+                rows.append({'seq': _seq, 'name': slots[_seq],
                              'has': (_seq in has) or (_seq == 1 and collab and owns)})
             else:
-                rows.append({'name': '皮肤 %03d' % _seq, 'has': True})
+                rows.append({'seq': _seq, 'name': '皮肤 %03d' % _seq, 'has': True})
         have = sum(1 for r in rows if r['has'])
         # 计数严格按「框里亮了几格」来算 ⇒ 顶部统计与列表永远对得上
         _a = 1 if rows[0]['has'] else 0                              # 初始那一格
@@ -952,6 +953,25 @@ def _avatar_data(tag):
 ART_STATE = {'running': False, 'text': '正在检查本机游戏的头像资源…', 'i': 0, 'n': 0,
              'done': False, 'found': 0, 'game': True, 'seconds': 0, 'reason': ''}
 ART_LOCK = threading.Lock()
+
+# ── 皮肤立绘索引：首次全量扫描冷包，后台线程执行，前端轮询进度 ──
+BUST_STATE = {'building': False, 'done': 0, 'total': 0, 'count': 0, 'err': ''}
+
+
+def _bust_on_progress(done, total):
+    BUST_STATE['done'] = done
+    BUST_STATE['total'] = total
+
+
+def _bust_build():
+    from astral import gameart
+    try:
+        d = gameart.build_bust_index(on_progress=_bust_on_progress)
+        BUST_STATE['count'] = len((d or {}).get('map') or {})
+    except Exception as e:
+        BUST_STATE['err'] = str(e)[:120]
+    finally:
+        BUST_STATE['building'] = False
 
 
 def art_scan_start():
@@ -1519,7 +1539,79 @@ class Api:
         """首屏头像提取进度：running / ready（已可用角色）/ done。"""
         return dict(PRIO_STATE)
 
+    # ── 皮肤立绘 ─────────────────────────────────────────────
+    def bust_index(self, start=False):
+        """立绘索引状态；start=True 时在后台开始建（首次全量约 2~3 分钟）。
+
+        前端轮询这个接口画进度条，ready=true 后再调 skin_bust()。
+        """
+        from astral import gameart
+        ready = False
+        try:
+            ready = gameart.bust_index_ready()
+        except Exception:
+            pass
+        if not ready and start and not BUST_STATE['building']:
+            BUST_STATE.update(building=True, done=0, total=0, err='')
+            threading.Thread(target=_bust_build, daemon=True).start()
+        stale = False
+        try:
+            stale = gameart.bust_index_stale()
+        except Exception:
+            pass
+        return {'ready': ready, 'stale': stale, 'building': BUST_STATE['building'],
+                'done': BUST_STATE['done'], 'total': BUST_STATE['total'],
+                'count': BUST_STATE['count'], 'err': BUST_STATE['err']}
+
+    def skin_bust(self, hero_id, seq=1):
+        """某角色某套皮肤的立绘大图（data URL）。取不到就照实说，不糊弄。"""
+        from astral import gameart
+        try:
+            p = gameart.bust_png(int(hero_id), int(seq))
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:100]}
+        if not p:
+            try:
+                need = not gameart.bust_index_ready()
+            except Exception:
+                need = False
+            stale = False
+            try:
+                stale = gameart.bust_index_stale()
+            except Exception:
+                pass
+            return {'ok': False, 'need_index': need, 'need_rebuild': stale,
+                    'msg': ('游戏更新过了，立绘索引要重建（约 2~3 分钟）' if stale
+                            else '本机游戏资源里没找到这张立绘')}
+        try:
+            import base64
+            return {'ok': True, 'key': p.stem,
+                    'url': 'data:image/png;base64,'
+                           + base64.b64encode(p.read_bytes()).decode('ascii')}
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:100]}
+
     # ── 索引 / 回放号 统一解析（复盘查询要用回放号，原「最近对局」用下标）──
+    def skin_art(self, hero_id, seq=1):
+        """一套皮肤的全部图：左立绘 + 右两张进战 CG，返回 data URI。"""
+        from astral import gameart
+        try:
+            art = gameart.skin_art(int(hero_id), int(seq))
+        except Exception as e:
+            return {'ok': False, 'msg': str(e)[:100]}
+        out = {}
+        for k in ('card', 'cg0', 'cg1'):
+            f = art.get(k)
+            if f:
+                out[k] = 'data:image/png;base64,' + base64.b64encode(f.read_bytes()).decode('ascii')
+        if not out:
+            return {'ok': False, 'msg': '本机游戏资源里没找到这套皮肤的图',
+                    'need_rebuild': gameart.bust_index_stale()}
+        out['ok'] = True
+        out['keys'] = {k: (art.get(k).stem if art.get(k) else '') for k in ('card', 'cg0', 'cg1')}
+        return out
+
+
     def _resolve_ref(self, ref):
         """把「最近对局的下标」或「回放号」统一解析成 (回放号, 该局记录)。
 
