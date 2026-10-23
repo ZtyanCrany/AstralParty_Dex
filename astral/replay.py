@@ -30,6 +30,9 @@ COND_FIELDS = (
     'kill_count', 'kill_pve_monster', 'kill_thief',      # 击杀三件套
     'total_damage', 'total_injured', 'total_die', 'selfDie',
     'gold', 'initGoldCount', 'movePoint', 'buyRelicNum', 're_roll_num',
+    'transferGold',   # 转账给队友的星币
+    'treatmentScore', # 治疗量（辅助位指标）
+    'finalKillBoss',  # 是否击杀/参与击杀 BOSS
 )
 
 

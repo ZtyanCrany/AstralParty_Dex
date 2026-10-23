@@ -17,6 +17,7 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root{
+    --cmpcard:#FFFFFF;   /* 评分表：评分+评级小卡片 */
     --bg:#F0EEE6; --side:#E3DACC; --card:#FFFFFF; --line:#D9D2C4;
     --ink:#2B2823; --dim:#8A8377; --accent:#C8553D; --ok:#4A7C59;
     --gold:#C99A2E; --blue:#4A6FA5;
@@ -699,7 +700,20 @@
   .rf{ font-size:10.5px; color:var(--t-B0A995); padding:0 5px;
        background:var(--s-F4F0E6); border-radius:5px; }
   .mnote{ font-size:10.5px; color:var(--t-A79F8C); margin-top:7px; padding-top:6px;
-          border-top:1px dashed var(--b-E8E2D4); display:flex; justify-content:space-between; }
+          border-top:1px dashed var(--b-E8E2D4); display:flex; justify-content:flex-start;
+          align-items:center; gap:12px; }
+  .scbtn{ font:inherit; font-size:10.5px; line-height:1.6; color:var(--t-B4633A);
+          background:var(--s-FBF1EA); border:1px solid var(--b-E8D5C6); border-radius:7px;
+          padding:1px 9px; cursor:pointer; white-space:nowrap; transition:background .15s; }
+  .scbtn:hover{ background:var(--s-F6E4D8); }
+  .scmbox{ width:min(790px,94vw); }
+  .scres{ font-size:11.5px; font-weight:700; letter-spacing:.6px; padding:1px 8px;
+          border-radius:6px; align-self:flex-start; margin-bottom:2px; }
+  .scres.win{ background:#DDEBD8; color:#3C6B33; }
+  .scres.lose{ background:#EFE2DE; color:#7B4A3E; }
+  [data-theme="dark"] .scres.win{ background:#2C3A2A; color:#A8CC9E; }
+  [data-theme="dark"] .scres.lose{ background:#3A2C29; color:#D8A99B; }
+  .schow{ color:var(--t-A79F8C); font-size:10px; margin-left:8px; }
 
   .match{ border-bottom:1px solid var(--b-F2EFE7); }
   .match:last-child{ border-bottom:0; }
@@ -709,7 +723,11 @@
   .mhead:hover{ background:var(--s-FAF8F3); }
   .mhead .t{ color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums;
              white-space:nowrap; }
-  .mhead .h{ display:flex; align-items:center; gap:7px; font-weight:600; }
+  .mhead .h{ display:flex; align-items:center; gap:7px; font-weight:600; min-width:0; }
+  .mhead .h > .scbtn{ flex:none; }
+  .mhb{ font-size:10px !important; padding:0 7px !important; line-height:1.75 !important;
+        border-radius:5px !important; font-weight:500; }
+  [data-theme="dark"] .mhb{ background:#3A332C; border-color:#4E443A; color:#D8B39B; }
   .mhead .res{ font-size:12px; font-weight:600; text-align:left; }
   .mhead .res.win{ color:var(--ok); } .mhead .res.lose{ color:var(--accent); }
   .mhead .m{ justify-self:start; display:inline-flex; align-items:stretch; overflow:hidden;
@@ -851,6 +869,7 @@
   /* ── 深色 ── 只换调色板，不动布局；正文 11.2:1、次要 6.4:1、强调 5.4:1（过 WCAG AA） */
   [data-theme="dark"]{
     color-scheme: dark;
+    --cmpcard:#3B3833;
     --bg:#2D2B28;
     --side:#242321;
     --card:#353330;
@@ -1060,13 +1079,13 @@
     --sh11:rgba(0,0,0,0.248);
   }
 
-  /* ── 皮肤立绘弹窗 ── */
+  /* ── 皮肤立绘弹窗（beta）── */
   .bust{ position:fixed; inset:0; z-index:150; display:flex; flex-direction:column;
          align-items:center; justify-content:center; gap:10px; padding:24px;
          background:var(--sh8); transition:opacity .18s; }
   .bust.hide{ opacity:0; pointer-events:none; }
   .bustbody{ display:flex; align-items:center; justify-content:center; gap:16px; max-width:94vw; }
-  /* 背景层：卡面自身放大模糊后铺满，透明区域不露纯色底 */
+  /* 环境底：把卡面自身糊掉铺满，透明图才不像浮在灰板上 */
   /* 纸白：半透明米白，底部界面隐约透出来 */
   .bust{ background:rgba(240,238,230,.68);
          -webkit-backdrop-filter:blur(11px) saturate(1.05); backdrop-filter:blur(11px) saturate(1.05); }
@@ -1092,7 +1111,7 @@
                      box-shadow:0 10px 22px rgba(74,58,42,.10), 0 2px 6px rgba(74,58,42,.06); }
   .bustright .print img{ display:block; max-height:31vh; max-width:47vw; border-radius:0;
                          filter:drop-shadow(0 2px 6px rgba(74,58,42,.10)); }
-  /* 字幕：角色名与皮肤名分两行，左侧强调竖条 */
+  /* 字幕：上下两行 + 左侧强调条（横排无论怎么调都有空隙，竖排最紧凑）*/
   .bust .bcap{ display:flex; align-items:stretch; gap:10px; padding:6px 16px 7px 0;
                border-radius:10px; background:rgba(18,16,14,.52);
                border:1px solid rgba(255,255,255,.10);
@@ -1121,6 +1140,67 @@
   [data-theme="dark"] .bust .bx{ color:rgba(240,238,230,.60); }
   .chip.sk{ cursor:pointer; }
   .chip.sk:hover{ filter:brightness(.97); transform:translateY(-1px); }
+  /* ── 评分并排对比 ─────────────────────────────── */
+  .cmwrap{ overflow-x:auto; margin:0 12px 4px; }
+  .cmtab{ width:100%; border-collapse:collapse; font-size:12px; }
+  .cmtab th, .cmtab td{ padding:7px 8px; text-align:center; }
+  .cmtab thead th.cmp{ padding:6px 6px 10px; vertical-align:top; min-width:132px; }
+  .cmtab thead th:first-child{ width:110px; }
+  /* 行与行只留一条极浅的分隔线，不再给单元格套框 */
+  .cmtab tbody tr{ border-top:1px solid var(--b-F1ECE2); }
+  .cmtab .cmk{ text-align:left; color:var(--dim); font-weight:400; white-space:nowrap;
+    padding-left:10px; }
+  .cmtab .cmnote{ display:block; font-style:normal; font-size:10px; color:var(--t-8A8378);
+    margin-top:1px; }
+  .cmtab .cmv{ font-variant-numeric:tabular-nums; color:var(--ink); }
+  .cmtab .cmx{ display:block; font-size:10px; line-height:1.35; margin-top:1px;
+    color:var(--t-8A8378); font-variant-numeric:tabular-nums; }
+  .cmtab td.win .cmv{ font-weight:700; color:var(--accent); }
+  /* 表格底部的公式说明（默认收起） */
+  .cmf{ margin:18px 10px 2px;
+    font-size:11px; line-height:1.75; color:var(--dim); }
+  .cmf summary{ cursor:pointer; list-style:none; font-size:11px; color:var(--dim); }
+  .cmf summary::-webkit-details-marker{ display:none; }
+  .cmf summary::before{ content:'▸'; display:inline-block; width:12px; margin-right:3px;
+    transition:transform .15s; transform-origin:40% 50%; }
+  .cmf[open] summary::before{ transform:rotate(90deg); }
+  .cmfbody{ margin-top:6px; }
+  .cmfbody b{ color:var(--ink); font-weight:600; }
+  .cmfh{ margin-top:7px; font-size:10.5px; letter-spacing:.4px; opacity:.72; }
+  .cmfnote{ opacity:.8; }
+  .cmav img{ width:30px; height:30px; border-radius:50%; object-fit:cover; display:block; margin:0 auto 4px; }
+  .cmav:empty{ height:0; }
+  .cmnm{ font-weight:600; color:var(--ink); font-size:12px; line-height:1.25;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px; margin:0 auto; }
+  .cmsub{ font-size:10.5px; color:var(--t-8A8378); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 评分 + 评级：紧凑小卡，评级贴右边缘；圆角压小 */
+  .cmrt{ display:inline-flex; align-items:stretch; height:24px; margin-top:6px;
+    background:var(--cmpcard); border-radius:6px; overflow:hidden;
+    box-shadow:0 1px 2px rgba(74,58,42,.06); }
+  .cmrt b{ display:block; padding:0 9px 0 11px;
+    font-size:18px; line-height:24px; letter-spacing:-.5px; color:var(--ink);
+    font-variant-numeric:tabular-nums; transform:translateY(-1.5px); }
+  .cmrt .gg{ position:static; align-self:stretch; display:flex; align-items:center;
+    justify-content:center; border-radius:0 6px 6px 0; padding:0 8px 1px;
+    font-size:13px; letter-spacing:.3px; }
+  .gg{ font-style:normal; display:inline-flex; align-items:center;
+    border-radius:0; line-height:1; background:var(--s-EDE7DB); }
+  .gg.gSS{ background:#F0D48A; color:#6B4A05; }
+  .gg.gS{ background:#F3E3B8; color:#7A5A10; }
+  .gg.gA{ background:#DDEBD8; color:#3C6B33; }
+  .gg.gB{ background:#DEE6F0; color:#3B5878; }
+  .gg.gC{ background:#EDE7DB; color:#6B6355; }
+  .gg.gD{ background:#EFE2DE; color:#7B4A3E; }
+  [data-theme="dark"] .gg{ background:#33302B; color:#B9B1A3; }
+  [data-theme="dark"] .gg.gSS{ background:#4A3A12; color:#F2D48C; }
+  [data-theme="dark"] .gg.gS{ background:#3A2F16; color:#E8C77A; }
+  [data-theme="dark"] .gg.gA{ background:#25331F; color:#A8CC9E; }
+  [data-theme="dark"] .gg.gB{ background:#243040; color:#9DBBDC; }
+  [data-theme="dark"] .gg.gC{ background:#33302B; color:#B9B1A3; }
+  [data-theme="dark"] .gg.gD{ background:#3A2A25; color:#D8A99B; }
+  .cmtab .cmv{ font-variant-numeric:tabular-nums; color:var(--ink); }
+    font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -1171,6 +1251,12 @@
     </div>
     <div class="rvtabs" id="rvTabs"></div>
     <div class="rvbody" id="rvBody"></div>
+  </div>
+</div>
+<div id="scm" class="rv hide" onclick="if(event.target===this)closeScoreModal()">
+  <div class="rvbox scmbox">
+    <div class="rvhead" id="scmHead"></div>
+    <div class="rvbody" id="scmBody"></div>
   </div>
 </div>
 <div id="bust" class="bust hide" onclick="bustAway(event)">
@@ -1452,7 +1538,8 @@ window.renderStats = (r, st, mi) => {
   const sum = k => ps.reduce((a,p)=>a+(S(p)[k]||0), 0);
   return `<div class="mtab">${head}${rows}</div>
     <div class="mnote"><span>总${LAB[kk]||kk} <b>${sum(kk)}</b>　总伤害 <b>${sum('伤害')}</b>
-      　总承伤 <b>${sum('承伤')}</b>　总星币 <b>${sum('星币')}</b></span></div>`;
+      　总承伤 <b>${sum('承伤')}</b>　总星币 <b>${sum('星币')}</b></span>
+      </div>`;
 };
 
 
@@ -1619,7 +1706,8 @@ function afterLogin(profile){
   unlock();
   const nl = document.getElementById('navLogin'); if(nl) nl.style.display='none';
   const lo = document.getElementById('btnLogout'); if(lo) lo.style.display='block';
-  // 文字内容不依赖头像，先渲染；头像解出后再补一次，避免首屏空着。
+  // 先把文字画出来（皮肤/对局/统计都不依赖头像），头像再慢慢补 ——
+  // 之前是先 await loadAvatars() 才 render，美术资源没解完整页空着，体验很差。
   render(profile);
   setTimeout(()=>nav('profile'), 250);
   loadAvatars().then(()=>{ try{ if(window.__profile) render(window.__profile); }catch(e){} });
@@ -2031,7 +2119,7 @@ function renderSkins(d){
   syncStabThumb();
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
-// ── 皮肤立绘大图：首次需要建立资源索引（扫描安装目录的冷包）──
+// ── 皮肤立绘大图（beta）：首次要先建索引（扫冷包，2~3 分钟）──
 window.__bustCache = window.__bustCache || {};
 window.openBust = async (el) => {
   const hid = Number(el.dataset.hid || 0);
@@ -2170,7 +2258,7 @@ function render(d){
         <div class="t">${fmtTime(r.time)}</div>
         <div class="m" id="map${i}">读取中…</div>
         <div class="res ${resOf(r.rank, r.mapType, r.players).win?'win':'lose'}">${resOf(r.rank, r.mapType, r.players).text}</div>
-        <div class="h">${r.hero}</div>
+        <div class="h">${r.hero}<button class="scbtn mhb" onclick="event.stopPropagation();openScoreModal(${i})" title="看本局四人的综合评分">评分 ▸</button></div>
         <div class="arw">▶</div>
       </div>
       <div class="mbody" id="mb${i}"></div>
@@ -2256,6 +2344,101 @@ function render(d){
   };
 
   window.closeReview = () => document.getElementById('rv').classList.add('hide');
+
+  // ── ★ 本局评分弹窗（从对局卡片头部进入）──
+  window.openScoreModal = async (mi) => {
+    const head = document.getElementById('scmHead');
+    const box  = document.getElementById('scmBody');
+    document.getElementById('scm').classList.remove('hide');
+    head.innerHTML = '<div class="rhtxt"><div class="rn">正在解析…</div></div>' +
+                     '<div class="rx" onclick="closeScoreModal()">✕</div>';
+    box.innerHTML = '<div class="mload">正在解析本局回放…（首次约 3~8 秒，同一局再开秒开）</div>';
+    try{
+      let rv = window.__rvCache[mi];
+      if(!rv){
+        const r = await window.pywebview.api.load_review(mi);
+        if(!r || !r.ok){
+          box.innerHTML = '<div class="mload">✗ ' + window.__esc((r && r.msg) || '解析失败') + '</div>';
+          return;
+        }
+        rv = r.review; window.__rvCache[mi] = rv;
+      }
+      const win = !!rv.boss_killed;
+      head.innerHTML =
+        '<div class="rhtxt">' +
+          '<div class="scres ' + (win ? 'win' : 'lose') + '" title="胜负按本局 BOSS 是否被击破判断">' +
+            (win ? '胜利' : '失败') + '</div>' +
+          '<div class="rn">' + window.__esc(rv.map_name || '本局') + dChip(rv.difficulty) + '</div>' +
+          '<div class="rh">' + (rv.time ? fmtTime(rv.time) : '') + '</div>' +
+        '</div>' +
+        '<div class="rx" onclick="closeScoreModal()">✕</div>';
+      box.innerHTML = window.cmpTable(rv);
+    }catch(e){
+      box.innerHTML = '<div class="mload">✗ ' + window.__esc(e) + '</div>';
+    }
+  };
+  window.closeScoreModal = () => document.getElementById('scm').classList.add('hide');
+
+window.cmpTable = (rv) => {
+  const esc = window.__esc;
+  const ps = (rv.players || []).slice().sort((a, b) => (a.slot == null ? 9 : a.slot) - (b.slot == null ? 9 : b.slot));
+  if(!ps.length || !ps[0].score) return '<div class="rvfoot">这局没有可对比的评分数据</div>';
+  const ref = ps[0].score.parts || [];
+  const fmt = (key, raw) => {
+    if(key === 'surv') return Math.round(Number(raw) * 100) + '%';
+    if(key === 'eff')  return Number(raw).toFixed(2);
+    return String(raw);
+  };
+  let head = '<tr><th class="cmk">评分</th>';
+  ps.forEach(p => {
+    const sc = p.score, av = avOf(p.hero_id);
+    head += '<th class="cmp">' +
+      '<div class="cmav">' + (av ? '<img src="' + esc(av) + '" onerror="this.style.display=\'none\'">' : '') + '</div>' +
+      '<div class="cmnm">' + esc(p.nick) + (p.me ? '（我）' : '') + '</div>' +
+      '<div class="cmsub">' + (p.level ? 'Lv.' + p.level : '') +
+        (p.hero_name ? (p.level ? ' ' : '') + esc(p.hero_name) : '') + '</div>' +
+      '<div class="cmrt"><b>' + Number(sc.rating).toFixed(2) + '</b>' +
+        '<i class="gg g' + esc(sc.grade) + '">' + esc(sc.grade) + '</i></div></th>';
+  });
+  head += '</tr>';
+
+  let body = '';
+  ref.forEach(r => {
+    const best = Math.max.apply(null, ps.map(p => {
+      const x = (p.score.parts || []).find(y => y.key === r.key);
+      return x ? x.ratio : 0;
+    }));
+    body += '<tr><th class="cmk">' + esc(r.label) +
+      (r.note ? '<i class="cmnote">（' + esc(r.note) + '）</i>' : '') + '</th>';
+    ps.forEach(p => {
+      const x = (p.score.parts || []).find(y => y.key === r.key) || { raw: 0, ratio: 1 };
+      const hot = best > 1.02 && Math.abs((x.ratio || 0) - best) < 1e-9;
+      const sub = (r.key === 'eff')
+        ? '<span class="cmx">(' + Number((p.totals || {}).dmg || 0) + '/' + Number((p.totals || {}).gold || 0) + ')</span>'
+        : '';
+      body += '<td class="' + (hot ? 'win' : '') + '">' +
+        '<span class="cmv">' + esc(fmt(r.key, x.raw || 0)) + '</span>' + sub + '</td>';
+    });
+    body += '</tr>';
+  });
+
+  const formula =
+    '<details class="cmf"><summary>评分是怎么算的</summary>' +
+    '<div class="cmfbody">' +
+    '<div><b>综合评分</b> = Σ（权重 × 位置倾斜 × 相对倍率）÷ 队内均值 ÷ 0.80</div>' +
+    '<div><b>相对倍率</b> = （个人数值 + 0.6 × 队内均值）÷（1.6 × 队内均值），单项上限 2.60</div>' +
+    '<div class="cmfnote">0.6 倍均值是保底项：某一项完全没做也不会直接扣成 0。</div>' +
+    '<div class="cmfh">权重</div>' +
+    '<div>伤害转化率 19.4% · 输出伤害 16.1% · 转账 16.1% · 击杀 14.0% · 治疗 10.8% · 存活时间 10.8% · 有效承伤 7.5% · 移动步数 5.4%</div>' +
+    '<div class="cmfh">位置倾斜</div>' +
+    '<div>1 号位：治疗、转账 ×1.45，输出 ×0.75，击杀 ×0.80<br>' +
+    '2 号位：治疗 ×1.10，转账 ×1.15，输出与击杀不调整<br>' +
+    '3 / 4 号位（双主 C，完全一致）：输出 ×1.15，击杀 ×1.12，转账 ×0.55，治疗 ×0.50</div>' +
+    '<div class="cmfh">为什么要 ÷0.80</div>' +
+    '<div>内部评分队内均值恒为 1.000；÷0.80 只是换显示口径，让 1.00 = 及格线、1.25 ≈ 队内平均，排序与倍率都不变。</div>' +
+    '</div></details>';
+  return '<div class="cmwrap"><table class="cmtab"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + formula;
+};
 
 window.renderReview = (rv, uid) => {
     const esc = window.__esc;
@@ -2374,8 +2557,7 @@ window.renderReview = (rv, uid) => {
     let html;
     if(S.tab === 'stats'){
       const c = S.stats;
-      html = (c.score ? '<div class="rvsec"><h4>本局评分</h4>' + c.score + '</div>' : '') +
-             '<div class="rvsec"><h4>轮次数据</h4>' + c.tab + '</div>' +
+      html = '<div class="rvsec"><h4>轮次数据</h4>' + c.tab + '</div>' +
              '<div class="rvsec"><h4>筹码总览（' + c.nchip + ' 个）</h4><div class="chips">' +
                c.chips + '</div></div>' +
              '<div class="rvsec"><h4>获取筹码明细</h4>' +

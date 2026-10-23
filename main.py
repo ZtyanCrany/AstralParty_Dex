@@ -787,7 +787,7 @@ def get_replay_file(replay_id):
 #   缓存版本：改动复盘数据结构（新增字段）或筹码事件算法后必须 +1，否则旧缓存会被直接复用，
 #   导致新增字段缺失、功能不生效（例如旧缓存里没有 skin 字段时，头像会全部回落到初始皮肤；
 #   链的切分改动后，旧缓存仍会把同一串候选画两遍）。任务名不进缓存，每次按表现算。
-REVIEW_CACHE_VERSION = 13
+REVIEW_CACHE_VERSION = 22
 
 
 def build_review_cached(replay_id):
@@ -954,7 +954,7 @@ ART_STATE = {'running': False, 'text': '正在检查本机游戏的头像资源�
              'done': False, 'found': 0, 'game': True, 'seconds': 0, 'reason': ''}
 ART_LOCK = threading.Lock()
 
-# ── 皮肤立绘索引：首次全量扫描冷包，后台线程执行，前端轮询进度 ──
+# ── 皮肤立绘索引（beta）：全量扫冷包约 2~3 分钟，放后台线程，前端轮询进度 ──
 BUST_STATE = {'building': False, 'done': 0, 'total': 0, 'count': 0, 'err': ''}
 
 
@@ -1688,6 +1688,8 @@ class Api:
             if not rv.get('map_name'):
                 rv['map_name'] = map_name(rv.get('map_id'))
             rv['task_names'] = mission_names(rv.get('map_id'), rv.get('missions'))
+            # 回放里没有 GameFinishS2C，胜负只能按「BOSS 是否被击破」推断
+            rv['boss_killed'] = bool(any((p.get('totals') or {}).get('boss') for p in rv['players']))
             rv['time'] = one.get('time')
             meta = {str(x.get('id')): x for x in (one.get('players') or [])}
             for p in rv['players']:

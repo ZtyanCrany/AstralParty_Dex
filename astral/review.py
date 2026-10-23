@@ -576,13 +576,127 @@ def _rounds_for(rp, uid):
             'round': rnd,
             'kill': max(kill, 0), 'dmg': max(d('total_damage'), 0),
             'inj': max(d('total_injured'), 0), 'gold': max(gold, 0),
-            'move': max(d('movePoint'), 0),
+            'move': max(d('movePoint'), 0), 'transfer': max(d('transferGold'), 0),
+            'tret': max(d('treatmentScore'), 0), 'boss': bool(v.get('finalKillBoss')),
             'died': deaths > 0, 'deaths': deaths,
         })
         prev = v
-    total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move')}
+    total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move', 'transfer', 'tret')}
     total['died'] = sum(r['deaths'] for r in rows)   # 次数而非「死过的轮数」
+
+    # ── v2 派生指标 ───────────────────────────────────────
+    n_rounds = len(rows) or 1
+    death_rounds = sum(1 for r in rows if r['died'])
+    total['rounds'] = len(rows)
+    total['death_rounds'] = death_rounds
+    total['surv_rate'] = (len(rows) - death_rounds) / n_rounds          # 存活轮占比
+    total['nonfatal_inj'] = sum(r['inj'] for r in rows if not r['died'])  # 不致死的承伤
+    total['boss'] = 1 if any(r['boss'] for r in rows) else 0
+    # 伤害转化率：拿多少钱打出多少伤害（金币下限 50，避免极小额把比值放大）
+    total['eff'] = total['dmg'] / max(total['gold'], 50)
     return rows, total
+
+
+# ── 局内评分 ─────────────────────────────────────────
+#   回答的是「这一局谁贡献大」，不是「这个人强不强」：
+#   所有指标都只在本局四人之间做相对比较（与该局队内均值比），换一局队友就重新算。
+#   跨局比较需要按段位/地图分桶另建模型，两种口径不可混用。
+SCORE_ITEMS_V2 = [
+    #  key        标签          相对权重  方向
+    ('eff',      '伤害转化率',  18,  1),    # 伤害 / 星币
+    ('dmg',      '输出伤害',    15,  1),
+    ('kill',     '击杀',        13,  1),
+    ('transfer', '转账',        15,  1),    # 比治疗更值钱：治疗自己也在涨治疗分
+    ('tret',     '治疗',        10,  1),
+    ('surv',     '存活时间',    10,  1),    # 未死亡轮次占比（仍按百分比显示）
+    ('ninj',     '有效承伤',     7,  1),
+    ('move',     '移动步数',     5,  1),
+]
+
+# rating 档位（队内均值严格 = 1.00）
+#   ≥1.80 SS · 1.50–1.80 S · 1.25–1.50 A · 1.00–1.25 B（平均） · 0.80–1.00 C · <0.80 D
+SCORE_GRADES = ((1.80, 'SS'), (1.50, 'S'), (1.25, 'A'), (1.00, 'B'), (0.80, 'C'))
+# 指标名下方的小注（解释这个数怎么来的）
+SCORE_NOTES = {'eff': '伤害量/星币数'}
+RATING_CAP = 2.60          # 单项比值上限，防止一个极端值把整张卡抬飞
+
+POS_TILT = {
+    1: {'tret': 1.45, 'transfer': 1.45, 'dmg': 0.75, 'kill': 0.80},
+    2: {'tret': 1.10, 'transfer': 1.15, 'dmg': 1.00, 'kill': 1.00},   # 辅C：输出不再压
+    3: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50},   # 主C
+    4: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50},   # 主C（与 3 号位一致）
+}
+# 显示基准：内部 rating 均值恒为 1.00，展示时除以 BASELINE，
+# 使 1.00 = 及格线（约队内末位 20~25% 分位），队内平均落在 1.2 上下
+RATING_BASELINE = 0.80
+
+
+def _score_raw(p, key):
+    t = p.get('totals') or {}
+    alias = {'surv': 'surv_rate', 'ninj': 'nonfatal_inj'}
+    return float(t.get(alias.get(key, key), 0) or 0)
+
+
+def score_players(players, tilt=True):
+    """同局四人 rating（队内均值 = 1.00，类似 CS 的 HLTV rating）。
+
+    1. 每项指标取「本人数值 ÷ 队内均值」，得到相对强度（均值 1.00）；
+    2. 单项比值截断到 2.6，避免一个爆表值带偏整张卡；
+    3. 按位置软加权（1/2 号位转账·治疗↑，3/4 号位输出↑），权重归一化到 1；
+    4. rating = Σ(权重 × 比值)。因为每项比值的队内均值都是 1，
+       加权和的均值也是 1 —— 也就是「队内平均发挥 = 1.00」。
+    """
+    if not players:
+        return
+    n = len(players)
+    ratios = [dict() for _ in range(n)]
+    for key, _label, _w, direction in SCORE_ITEMS_V2:
+        vals = [_score_raw(p, key) for p in players]
+        mean = sum(vals) / n
+        for i, v in enumerate(vals):
+            if mean <= 0:
+                r = 1.0                      # 全队都没有这项 → 中性
+            else:
+                # 加 0.6 个队均做先验：(v + 0.6m) / 1.6m
+                # 0 → 0.375、均值 → 1.00、2 倍 → 1.625；队内均值仍严格是 1
+                r = (v + 0.6 * mean) / (1.6 * mean)
+            r = min(max(r, 0.0), RATING_CAP)
+            if direction < 0 and mean > 0:
+                r = min(max(2.0 - r, 0.0), RATING_CAP)
+            ratios[i][key] = r
+
+    raw_list = []
+    for i, p in enumerate(players):
+        tilt_map = POS_TILT.get(int(p.get('slot') or 0), {}) if tilt else {}
+        raw_w = {k: w * tilt_map.get(k, 1.0) for k, _l, w, _d in SCORE_ITEMS_V2}
+        wsum = sum(raw_w.values()) or 1.0
+        eff_w = {k: v / wsum for k, v in raw_w.items()}
+        parts, rating = [], 0.0
+        for key, label, _w, _dir in SCORE_ITEMS_V2:
+            w = eff_w[key]
+            r = ratios[i].get(key, 1.0)
+            rating += w * r
+            parts.append({'key': key, 'label': label,
+                          'note': SCORE_NOTES.get(key, ''),
+                          'raw': round(_score_raw(p, key), 3),
+                          'ratio': round(r, 3),
+                          'norm': round(min(r / RATING_CAP, 1.0), 4),   # 进度条长度
+                          'weight': round(w, 4),
+                          'contrib': round((r - 1.0) * w * 100, 1)})    # 相对均值的贡献偏差
+        raw_list.append(rating)
+        p['score'] = {'rating': rating, 'grade': '', 'parts': parts, 'scale': 'rating'}
+
+    # 单项截断会让均值略低于 1，这里按队内实际均值再拉回 1.00
+    mean_r = (sum(raw_list) / n) if n else 1.0
+    mean_r = mean_r or 1.0
+    for p in players:
+        sc = p['score']
+        sc['rating'] = round(sc['rating'] / mean_r / RATING_BASELINE, 2)
+        sc['total'] = sc['rating']
+        sc['grade'] = next((g for cut, g in SCORE_GRADES if sc['rating'] >= cut), 'D')
+
+    for p in players:
+        p['score']['rank'] = 1 + sum(1 for q in players if q['score']['rating'] > p['score']['rating'])
 
 
 # ── 主入口 ────────────────────────────────────────────────
@@ -611,6 +725,7 @@ def build_review(src, replay_id=None):
                        'round': e['round'], 'source': e['source']} for e in events],
         })
     players.sort(key=lambda p: p['slot'])
+    score_players(players)
     # 难度与地图：取自 Room 帧（#48 difficulty、#63 mapDifficultyId —— 后者是地图表 ID，
     # 比「回放前 300 字节推测地图」可靠，且离线可读）
     difficulty, map_diff_id = 0, 0
