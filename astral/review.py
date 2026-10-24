@@ -637,6 +637,20 @@ def _score_raw(p, key):
     return float(t.get(alias.get(key, key), 0) or 0)
 
 
+def _tilt_of(slot):
+    """位置倾斜查询：slot 是 0 基（0 = 1 号位），POS_TILT 的键是 1 基的「号位」。
+
+    两者差一位，直接拿 slot 去查会整体错开：1 号位拿不到倾斜、2 号位吃辅助倾斜、
+    3 号位吃辅 C 倾斜。取不到 slot 时返回空表（按无倾斜算），不要默认成 1 号位。
+    """
+    if slot is None:
+        return {}
+    try:
+        return POS_TILT.get(int(slot) + 1, {})
+    except (TypeError, ValueError):
+        return {}
+
+
 def score_players(players, tilt=True):
     """同局四人 rating（队内均值 = 1.00，类似 CS 的 HLTV rating）。
 
@@ -667,7 +681,7 @@ def score_players(players, tilt=True):
 
     raw_list = []
     for i, p in enumerate(players):
-        tilt_map = POS_TILT.get(int(p.get('slot') or 0), {}) if tilt else {}
+        tilt_map = _tilt_of(p.get('slot')) if tilt else {}
         raw_w = {k: w * tilt_map.get(k, 1.0) for k, _l, w, _d in SCORE_ITEMS_V2}
         wsum = sum(raw_w.values()) or 1.0
         eff_w = {k: v / wsum for k, v in raw_w.items()}

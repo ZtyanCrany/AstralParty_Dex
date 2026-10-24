@@ -787,7 +787,7 @@ def get_replay_file(replay_id):
 #   缓存版本：改动复盘数据结构（新增字段）或筹码事件算法后必须 +1，否则旧缓存会被直接复用，
 #   导致新增字段缺失、功能不生效（例如旧缓存里没有 skin 字段时，头像会全部回落到初始皮肤；
 #   链的切分改动后，旧缓存仍会把同一串候选画两遍）。任务名不进缓存，每次按表现算。
-REVIEW_CACHE_VERSION = 22
+REVIEW_CACHE_VERSION = 23
 
 
 def build_review_cached(replay_id):
