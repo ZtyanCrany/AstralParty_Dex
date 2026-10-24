@@ -2762,7 +2762,7 @@ async function doQuery(refresh, text){
         <div class="t">回放号 ${qesc(r.replay_id)}${rgTag()}</div>
         <div class="m got">${qesc(r.map_name || '未知地图')}${dChip(r.difficulty)}</div>
         <div class="res">对局</div>
-        <div class="h"></div>
+        <div class="h"><button class="scbtn mhb" onclick="openScoreModal('${r.replay_id}')" title="看本局四人的综合评分">评分 ▸</button></div>
         <div class="arw">▶</div>
       </div>
       <div class="mbody" id="qbody"></div>
@@ -2796,7 +2796,7 @@ async function doQuery(refresh, text){
         <div class="t">${qDate(rec.time)}</div>
         <div class="m${rec.map_name ? ' got' : ''}" id="qmap${i}">${qesc(rec.map_name || '—')}${dChip(rec.difficulty)}</div>
         <div class="res ${resOf(rec.rank, rec.mapType).win?'win':'lose'}">${resOf(rec.rank, rec.mapType).text}</div>
-        <div class="h">${qesc(rec.hero || '')}</div>
+        <div class="h">${qesc(rec.hero || '')}${rec.replayId ? `<button class="scbtn mhb" onclick="event.stopPropagation();openScoreModal('${rec.replayId}')" title="看本局四人的综合评分">评分 ▸</button>` : ''}</div>
         <div class="arw">▶</div>
       </div>
       <div class="mbody" id="qmb${i}"></div>
