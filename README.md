@@ -81,32 +81,35 @@ Windows可以直接**双击 `run_source.bat`**。
 
 **我的信息** —— 等级 / 场次 / 胜率 / 拥有角色皮肤 / 获赞 / 角色使用排行
 
-![我的信息](screenshots/01-profile.png)
+<p><img src="screenshots/01-profile.png" alt="我的信息" title="我的信息" width="80%"></p>
 
 **最近对局** —— 最近 10 局，展开看四位玩家的完整战绩表和评分评级
 
-![最近对局](screenshots/02-matches.png)
+<p><img src="screenshots/02-matches.png" alt="最近对局" title="最近对局" width="80%"></p>
+
+<p><img src="screenshots/08-rating.png" alt="本局评分" title="本局评分" width="80%"></p>
 
 **对局复盘** —— 在「最近对局」里**点击玩家名字**弹出
 
-![复盘弹窗](screenshots/03-replay.png)
+<p><img src="screenshots/03-replay.png" alt="复盘弹窗" title="复盘弹窗" width="80%"></p>
 
-![复盘明细](screenshots/04-replay-detail.png)
+<p><img src="screenshots/04-replay-detail.png" alt="复盘明细" title="复盘明细" width="80%"></p>
 
 **复盘查询** —— 输入回放号或玩家 UID，查单局或该玩家最近 10 局
 
-![复盘查询](screenshots/07-query.png)
+<p><img src="screenshots/07-query.png" alt="复盘查询" title="复盘查询" width="80%"></p>
 
 **我的皮肤** —— 按角色列出全部皮肤，标注拥有状态，点击标签查看立绘和进战插画
 
-![我的皮肤](screenshots/05-skins.png)
+<p><img src="screenshots/05-skins.png" alt="我的皮肤" title="我的皮肤" width="80%"></p>
+
+<p><img src="screenshots/09-bust.png" alt="立绘预览" title="立绘预览" width="80%"></p>
 
 **登录页面**
 
-![登录页](screenshots/06-login.png)
+<p><img src="screenshots/06-login.png" alt="登录页" title="登录页" width="80%"></p>
 
 ---
-
 
 ## 📁 项目结构
 
