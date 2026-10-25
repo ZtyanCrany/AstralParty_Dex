@@ -2201,7 +2201,38 @@ window.bustAway = (e) => {
   window.closeBust();
 };
 document.addEventListener('keydown', (e) => {
-  if(e.key === 'Escape') window.closeBust();
+  if(e.key === 'Escape') closeTopModal();
+});
+
+// ── 右键 / Esc 关闭最上层弹窗 ──
+// 从 z-index 最高的那个开始找，同层时取 DOM 里靠后的（视觉上盖在上面）。
+const MODAL_LAYERS = [
+  ['bust',  () => window.closeBust && window.closeBust()],
+  ['scm',   () => window.closeScoreModal && window.closeScoreModal()],
+  ['rv',    () => window.closeReview && window.closeReview()],
+  ['upd',   () => typeof closeUpdate === 'function' && closeUpdate()],
+  ['modal', () => typeof modalNo === 'function' && modalNo()],
+];
+function topOpenModal(){
+  let best = null;
+  for(const [id, close] of MODAL_LAYERS){
+    const el = document.getElementById(id);
+    if(!el || el.classList.contains('hide')) continue;
+    const z = parseInt(getComputedStyle(el).zIndex, 10) || 0;
+    if(!best || z >= best.z) best = { z, close };
+  }
+  return best;
+}
+function closeTopModal(){
+  const top = topOpenModal();
+  if(top) top.close();
+  return !!top;
+}
+document.addEventListener('contextmenu', (e) => {
+  const t = e.target;
+  // 输入框、可编辑区域保留原生菜单（右键粘贴等）
+  if(t && t.closest && t.closest('input, textarea, [contenteditable="true"]')) return;
+  if(closeTopModal()) e.preventDefault();
 });
 
 function rgTag(region){                        // 区服标签：同一账号在两边是两套数据
