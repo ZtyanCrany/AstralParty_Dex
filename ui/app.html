@@ -409,6 +409,33 @@
   .box{ background:var(--card); border:1px solid var(--line); border-radius:12px;
         padding:18px 20px; margin-bottom:18px; }
   .box h3{ font-size:14px; margin-bottom:14px; font-weight:600; }
+  /* ── 导出为图片：复制 / 保存 ── */
+  .boxhead{ display:flex; align-items:center; justify-content:flex-start; gap:10px; margin-bottom:14px; }
+  .boxhead h3{ margin:0; }
+  .shotbtns{ display:flex; align-items:center; gap:6px; }
+  .shotbtn{ width:26px; height:26px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+            border:1px solid var(--line); border-radius:7px; background:var(--s-FFF); color:var(--dim);
+            cursor:pointer; transition:color .15s, border-color .15s, background .15s; }
+  .shotbtn:hover{ color:var(--ink); border-color:var(--ink); }
+  .shotbtn:active{ transform:translateY(1px); }
+  .shotbtn.busy{ opacity:.45; pointer-events:none; }
+  .shotbtn svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.7;
+                stroke-linecap:round; stroke-linejoin:round; }
+  /* 评分弹窗标题：时间一行、地图与胜败一行，按钮跟在后面 */
+  .scmeta{ display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .scrow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .sctime{ font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; }
+  .scval{ font-size:13px; color:var(--ink); display:flex; align-items:center; gap:6px; min-width:0; }
+  .scval .rn{ font-size:15px; }
+  .scrow .scres{ font-size:11px; }
+  .scrow .shotbtns{ margin-left:4px; }
+  /* 导出时把页头和卡片包在一起；宽度与卡片一致，不额外加左右留白 */
+  .shotwrap{ padding:14px 0 0; background:var(--bg); box-sizing:border-box; }
+  .shotwrap.nohead{ padding:0; }
+  .shotwrap .box, .shotwrap .rvbox{ margin:0; box-shadow:none; }
+  .shot-head{ padding:0 20px 12px; }
+  .shot-head h2{ margin:0 0 2px; }
+  .shot-head .sub{ margin:0; }
   table{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
   /* 我的信息这类页面里的表头：滚动到该表时钉在 #main 顶部 */
   .box table thead th{ position:sticky; top:0; z-index:3; background:var(--card);
@@ -1254,7 +1281,7 @@
   </div>
 </div>
 <div id="scm" class="rv hide" onclick="if(event.target===this)closeScoreModal()">
-  <div class="rvbox scmbox">
+  <div class="rvbox scmbox" id="scmBox">
     <div class="rvhead" id="scmHead"></div>
     <div class="rvbody" id="scmBody"></div>
   </div>
@@ -1348,8 +1375,14 @@
       <h2 id="nick">　</h2>
       <div class="sub" id="subline">　</div>
       <div class="cards" id="cards"></div>
-      <div class="box">
-        <h3>角色使用排行</h3>
+      <div class="box" id="heroBox">
+        <div class="boxhead">
+          <h3>角色使用排行</h3>
+          <div class="shotbtns">
+            <button class="shotbtn" title="复制为图片" onclick="shotCopy(this,'heroes')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+            <button class="shotbtn" title="保存为图片" onclick="shotSave(this,'heroes')"><svg viewBox="0 0 24 24"><path d="M12 3v11"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg></button>
+          </div>
+        </div>
         <table>
           <colgroup><col style="width:40%"><col style="width:12%"><col style="width:12%">
                     <col style="width:12%"><col style="width:11%"><col style="width:13%"></colgroup>
@@ -2398,11 +2431,19 @@ function render(d){
       }
       const win = !!rv.boss_killed;
       head.innerHTML =
-        '<div class="rhtxt">' +
-          '<div class="scres ' + (win ? 'win' : 'lose') + '" title="胜负按本局 BOSS 是否被击破判断">' +
-            (win ? '胜利' : '失败') + '</div>' +
-          '<div class="rn">' + window.__esc(rv.map_name || '本局') + dChip(rv.difficulty) + '</div>' +
-          '<div class="rh">' + (rv.time ? fmtTime(rv.time) : '') + '</div>' +
+        '<div class="scmeta">' +
+          '<div class="scrow">' +
+            '<span class="sctime">' + (rv.time ? fmtTime(rv.time) : '—') + '</span>' +
+          '</div>' +
+          '<div class="scrow">' +
+            '<span class="scval"><span class="rn">' + window.__esc(rv.map_name || '本局') + '</span>' + dChip(rv.difficulty) + '</span>' +
+            '<span class="scval"><span class="scres ' + (win ? 'win' : 'lose') + '" title="胜负按本局 BOSS 是否被击破判断">' +
+              (win ? '胜利' : '失败') + '</span></span>' +
+            '<div class="shotbtns">' +
+              '<button class="shotbtn" title="复制为图片" onclick="shotCopy(this,\'score\')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>' +
+              '<button class="shotbtn" title="保存为图片" onclick="shotSave(this,\'score\')"><svg viewBox="0 0 24 24"><path d="M12 3v11"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg></button>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="rx" onclick="closeScoreModal()">✕</div>';
       box.innerHTML = window.cmpTable(rv);
@@ -2871,6 +2912,181 @@ window.refreshQuery = async () => {
   finally{
     const b = document.getElementById('qrf');
     if(b){ b.classList.remove('spin'); delete b.dataset.busy; }
+  }
+};
+
+// ── 导出为图片：复制到剪贴板 / 保存成文件 ──
+// 把节点连同页面 CSS 一起塞进 SVG 的 foreignObject，再画到 canvas 上：
+// 不引第三方库，头像、进度条、评级徽章也能保持和界面一致。
+const SHOT_HEAD = ['nick', 'subline'];     // 导出图统一带上的页头：昵称、区服、等级、UID
+
+window.__shotCard = kind => kind === 'score'
+  ? document.getElementById('scmBox')
+  : document.getElementById('heroBox');
+
+// 页头 + 卡片拼成一个整体，宽度和卡片一致
+window.__shotBuild = kind => {
+  const card = window.__shotCard(kind);
+  if(!card) return null;
+  const rect = card.getBoundingClientRect();
+  // 排行图不跟着窗口无限变宽：超过 980 就按 980 排版，列会自己收紧，分享时更好读
+  const w = Math.ceil(kind === 'score' ? rect.width : Math.min(rect.width, 980));
+  const withHead = kind !== 'score';          // 评分图只要卡片本体，不带页头
+  const wrap = document.createElement('div');
+  wrap.className = 'shotwrap' + (withHead ? '' : ' nohead');
+  wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + w + 'px;';
+  if(withHead){
+    const head = document.createElement('div');
+    head.className = 'shot-head';
+    for(const id of SHOT_HEAD){
+      const n = document.getElementById(id);
+      if(n) head.appendChild(n.cloneNode(true));
+    }
+    wrap.appendChild(head);
+  }
+  const copy = card.cloneNode(true);
+  copy.removeAttribute('id');
+  copy.style.width = w + 'px';            // 固定宽度：SVG 里的 vw 和页面不一致，不钉住会被重新排版
+  copy.style.maxWidth = 'none';
+  copy.style.maxHeight = 'none';
+  wrap.appendChild(copy);
+  return wrap;
+};
+
+window.__snapNode = async (el, scale, opts) => {
+  scale = scale || 2;
+  opts = opts || {};
+  const rect = el.getBoundingClientRect();
+  const w = Math.ceil(rect.width);
+  let css = '';
+  for (const sheet of document.styleSheets) {
+    try { for (const rule of sheet.cssRules) css += rule.cssText + '\n'; } catch(e) {}
+  }
+  css = css.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll('.shotbtns, .sbtn, .rx, .cmf').forEach(n => n.remove());   // 导出的图里不要按钮、排序箭头、关闭叉和公式说明
+  clone.style.position = 'static';                                         // 外层为了量尺寸挪到屏幕外，导出时必须回到正常流
+  clone.style.left = 'auto';
+  clone.style.top = 'auto';
+  clone.style.width = w + 'px';
+  clone.style.maxWidth = 'none';
+  clone.style.maxHeight = 'none';
+  clone.querySelectorAll('.rvbody').forEach(n => {
+    n.style.overflow = 'visible';
+    n.style.maxHeight = 'none';
+  });
+  const probe = document.createElement('div');                            // 先量出解开高度限制后的真实高度
+  probe.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + w + 'px;';
+  probe.appendChild(clone);
+  document.body.appendChild(probe);
+  const h = Math.ceil(clone.getBoundingClientRect().height);
+  probe.remove();
+  const bgRaw = getComputedStyle(el).backgroundColor;
+  const bg = (!bgRaw || bgRaw === 'rgba(0, 0, 0, 0)') ? getComputedStyle(document.body).backgroundColor : bgRaw;
+  const holder = document.createElement('div');
+  holder.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  // 主题是挂在 <html data-theme> 上的，复制一份到容器上，深色模式导出才不会退回浅色
+  const theme = document.documentElement.getAttribute('data-theme') || 'light';
+  holder.setAttribute('data-theme', theme);
+  holder.style.cssText = 'width:' + w + 'px;height:' + h + 'px;background:' + bg + ';';
+  const style = document.createElement('style');
+  style.textContent = css;
+  holder.appendChild(style);
+  holder.appendChild(clone);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
+            + '<foreignObject width="100%" height="100%">'
+            + new XMLSerializer().serializeToString(holder) + '</foreignObject></svg>';
+  const img = new Image();
+  const loaded = await new Promise(res => {
+    img.onload = () => res(true);
+    img.onerror = () => res(false);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  if(!loaded) throw new Error('画面生成失败');
+  const cv = document.createElement('canvas');
+  cv.width = w * scale; cv.height = h * scale;
+  const g = cv.getContext('2d');
+  g.scale(scale, scale);
+  g.fillStyle = bg;
+  g.fillRect(0, 0, w, h);
+  g.drawImage(img, 0, 0, w, h);
+  // 评分图裁掉四周多余的留白：上下各 8px，左边 8px、右边 26px
+  if(opts.crop){
+    const d = g.getImageData(0, 0, cv.width, cv.height).data;
+    const mid = ((cv.height - 1) * cv.width + Math.floor(cv.width / 2)) * 4;
+    const bgc = [d[mid], d[mid + 1], d[mid + 2]];
+    const diff = i => Math.abs(d[i] - bgc[0]) + Math.abs(d[i+1] - bgc[1]) + Math.abs(d[i+2] - bgc[2]);
+    let cutY = cv.height, topY = cv.height, minX = cv.width, maxX = -1;
+    for(let y = cv.height - 1; y >= 0; y--){
+      const off = y * cv.width * 4;
+      let rMin = -1, rMax = -1;
+      for(let x = 0; x < cv.width; x += 2){
+        if(diff(off + x * 4) > 60){ if(rMin < 0) rMin = x; rMax = x; }
+      }
+      if(rMax >= 0){
+        if(cutY === cv.height) cutY = y + 1;
+        topY = y;                                  // 一直往上扫，最后记下的就是最高的内容行
+      }
+      // 横贯整宽的细线（表头分隔线）不代表左右边界，跳过
+      if(rMax >= 0 && (rMax - rMin) < cv.width * 0.9){
+        if(rMin < minX) minX = rMin;
+        if(rMax > maxX) maxX = rMax;
+      }
+    }
+    if(maxX > minX){
+      const padL = Math.round(8 * scale);
+      const padR = Math.round(26 * scale);     // 右边留宽一点，最右列数字不贴边
+      const left = Math.max(0, minX - padL);
+      const right = Math.min(cv.width, maxX + padR + 1);
+      const top = Math.max(0, topY - Math.round(8 * scale));
+      const keep = Math.min(cv.height, cutY + Math.round(8 * scale));
+      const out = document.createElement('canvas');
+      out.width = right - left; out.height = keep - top;
+      out.getContext('2d').drawImage(cv, -left, -top);
+      return { url: out.toDataURL('image/png'), w: out.width / scale, h: out.height / scale };
+    }
+  }
+  return { url: cv.toDataURL('image/png'), w, h };
+};
+
+window.__shotRender = async kind => {
+  const wrap = window.__shotBuild(kind);
+  if(!wrap) throw new Error('找不到要导出的区块');
+  document.body.appendChild(wrap);
+  try {
+    const opts = kind === 'score' ? { crop: true } : null;
+    return await window.__snapNode(wrap, 2, opts);
+  } finally {
+    wrap.remove();
+  }
+};
+
+window.shotCopy = async (btn, kind) => {
+  if(btn && btn.classList.contains('busy')) return;
+  if(btn) btn.classList.add('busy');
+  try{
+    const o = await window.__shotRender(kind);
+    const r = await window.pywebview.api.copy_image(o.url);
+    window.qToast(r && r.ok ? '已复制到粘贴板' : ((r && r.msg) || '复制失败'), btn);
+  }catch(e){
+    window.qToast('复制失败：' + ((e && e.message) || e), btn);
+  }finally{
+    if(btn) btn.classList.remove('busy');
+  }
+};
+
+window.shotSave = async (btn, kind) => {
+  if(btn && btn.classList.contains('busy')) return;
+  if(btn) btn.classList.add('busy');
+  try{
+    const o = await window.__shotRender(kind);
+    const r = await window.pywebview.api.save_image(o.url, kind);
+    if(r && r.ok) window.qToast('已保存', btn);
+    else if(!r || r.msg !== '已取消保存') window.qToast((r && r.msg) || '保存失败', btn);
+  }catch(e){
+    window.qToast('保存失败：' + ((e && e.message) || e), btn);
+  }finally{
+    if(btn) btn.classList.remove('busy');
   }
 };
 

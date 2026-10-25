@@ -2703,6 +2703,99 @@ class Api:
         except Exception as e:
             return {'ok': False, 'msg': '保存失败：%s' % str(e)[:120]}
 
+    # ── 导出为图片：复制到剪贴板 / 另存为 PNG ──
+    @staticmethod
+    def _decode_png(data_url):
+        """校验并解出前端传回来的 PNG 字节。"""
+        import base64, io
+        from PIL import Image
+        head, _, b64 = str(data_url or '').partition(',')
+        if 'base64' not in head:
+            raise ValueError('图片数据格式不对')
+        raw = base64.b64decode(b64)
+        Image.open(io.BytesIO(raw)).verify()      # 先验一遍，坏数据不要往剪贴板里塞
+        return raw
+
+    def copy_image(self, data_url):
+        """把前端生成的图片放进 Windows 剪贴板（CF_DIB）。"""
+        try:
+            import ctypes, io
+            from PIL import Image
+            raw = self._decode_png(data_url)
+            im = Image.open(io.BytesIO(raw)).convert('RGB')
+            buf = io.BytesIO()
+            im.save(buf, 'BMP')
+            dib = buf.getvalue()[14:]             # 去掉 14 字节 BMP 文件头，剩下就是 DIB
+            CF_DIB, GMEM_MOVEABLE = 8, 0x0002
+            u, k = ctypes.windll.user32, ctypes.windll.kernel32
+            k.GlobalAlloc.restype = ctypes.c_void_p
+            k.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+            k.GlobalLock.restype = ctypes.c_void_p
+            k.GlobalLock.argtypes = [ctypes.c_void_p]
+            k.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            k.GlobalFree.argtypes = [ctypes.c_void_p]
+            u.SetClipboardData.restype = ctypes.c_void_p
+            u.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+            n = len(dib)
+            h = k.GlobalAlloc(GMEM_MOVEABLE, n)
+            if not h:
+                return {'ok': False, 'msg': '内存分配失败'}
+            p = k.GlobalLock(h)
+            if not p:
+                k.GlobalFree(h)
+                return {'ok': False, 'msg': '内存锁定失败'}
+            ctypes.memmove(p, dib, n)
+            k.GlobalUnlock(h)
+            opened = False
+            for _ in range(6):                    # 别的程序可能正占着剪贴板，稍等重试
+                if u.OpenClipboard(None):
+                    opened = True
+                    break
+                time.sleep(0.08)
+            if not opened:
+                k.GlobalFree(h)
+                return {'ok': False, 'msg': '剪贴板正被其他程序占用'}
+            try:
+                u.EmptyClipboard()
+                if not u.SetClipboardData(CF_DIB, h):
+                    raise OSError('写入剪贴板失败')
+                h = None                          # 成功后内存归系统所有，不能再释放
+            finally:
+                u.CloseClipboard()
+            return {'ok': True, 'w': im.width, 'h': im.height}
+        except Exception as e:
+            return {'ok': False, 'msg': '复制失败：%s' % str(e)[:120]}
+
+    def save_image(self, data_url, kind='heroes'):
+        """弹保存对话框，把图片存成 PNG。"""
+        try:
+            raw = self._decode_png(data_url)
+            nick = ((self.profile or {}).get('nick') or '星趴档案').replace('/', '_')
+            tag = '本局评分' if kind == 'score' else '角色使用排行'
+            default = '星趴档案_%s_%s_%s.png' % (tag, nick, time.strftime('%y%m%d_%H%M'))
+            path = None
+            try:
+                win = webview.windows[0] if getattr(webview, 'windows', None) else None
+                if win:
+                    dlg = getattr(getattr(webview, 'FileDialog', None), 'SAVE',
+                                  getattr(webview, 'SAVE_DIALOG', 30))
+                    res = win.create_file_dialog(dlg, save_filename=default,
+                                                 file_types=('PNG 图片 (*.png)', '所有文件 (*.*)'))
+                    if isinstance(res, (list, tuple)):
+                        res = res[0] if res else None
+                    path = res
+            except Exception:
+                path = None
+            if not path:
+                return {'ok': False, 'msg': '已取消保存'}
+            out = Path(path)
+            if out.suffix.lower() != '.png':
+                out = out.with_suffix('.png')
+            out.write_bytes(raw)
+            return {'ok': True, 'path': str(out)}
+        except Exception as e:
+            return {'ok': False, 'msg': '保存失败：%s' % str(e)[:120]}
+
 
 def _fit_window():
     """按屏幕尺寸自适应开窗。
