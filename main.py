@@ -206,7 +206,7 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.10'  # 工具版本号
+VERSION = 'v1.2.11'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 # 回放服务器按区服分，两服的**回放号互不相通**（拿一边的号查另一边一律 404）。
 # 登录时按 profile.region 设一次 REPLAY_REGION，之后全程跟着走 ——
@@ -1290,6 +1290,7 @@ class Api:
         self.profile = None
         self._sess = None           # 复用的游戏连接（见 _session）
         self._upd = {}              # 一键更新的下载状态（见 update_*）
+        self._rec_cache = {}        # 回放号 → 对局记录（时间/地图/难度），供按回放号打开弹窗时补元数据
 
     # ── 检查更新 / 一键更新 ────────────────────────────────────
     def update_check(self, force=False):
@@ -1623,7 +1624,8 @@ class Api:
         s = str(ref if ref is not None else '').strip()
         d = re.sub(r'\D', '', s)      # 前端可能传 "'1790…'"（加引号防止 JS 数字精度丢失）
         if len(d) >= 12:
-            return d, {}
+            # 按回放号打开时也要带上时间/地图：查不到就退回空记录（页头显示 —）
+            return d, dict(self._rec_cache.get(d) or {})
         try:
             idx = int(d)
         except Exception:
@@ -1906,6 +1908,8 @@ class Api:
                 r['difficulty'] = df.get(r['replayId'])
         except Exception:
             pass
+        for _r in recs:
+            self._rec_cache[str(_r.get('replayId') or '')] = _r
         return {'ok': True, 'kind': 'uid', 'uid': uid, 'self': True,
                 'nick': prof.get('nick') or '',
                 'level': int(prof.get('level') or 0),
@@ -1953,6 +1957,7 @@ class Api:
             except Exception:
                 pass
             rec = {'replayId': rid, 'time': 0, 'rank': 0, 'hero': '', 'players': players}
+            self._rec_cache[rid] = rec
             return {'ok': True, 'kind': 'replay', 'replay_id': rid, 'map_name': mapname,
                     'difficulty': diff, 'records': [rec], 'stats': st}
 
@@ -2021,6 +2026,8 @@ class Api:
                 'useHero': int(getattr(stt, 'useHero', 0) or 0),
                 'praiseNum': int(getattr(sd, 'praiseNum', 0) or 0),
             }
+            for _r in recs:
+                self._rec_cache[str(_r.get('replayId') or '')] = _r
             out = {'ok': True, 'kind': 'uid', 'uid': uid, 'nick': '',
                    'level': 0, 'online': False, 'statistics': statistics,
                    'records': recs}
