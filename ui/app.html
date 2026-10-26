@@ -2988,7 +2988,10 @@ window.__snapNode = async (el, scale, opts) => {
   // 主题是挂在 <html data-theme> 上的，复制一份到容器上，深色模式导出才不会退回浅色
   const theme = document.documentElement.getAttribute('data-theme') || 'light';
   holder.setAttribute('data-theme', theme);
-  holder.style.cssText = 'width:' + w + 'px;height:' + h + 'px;background:' + bg + ';';
+  // 正文颜色和字体写在 body 上，SVG 里没有 body：不补一份，没显式设色的文字会继承成黑色
+  const bodyCS = getComputedStyle(document.body);
+  holder.style.cssText = 'width:' + w + 'px;height:' + h + 'px;background:' + bg + ';'
+    + 'color:' + bodyCS.color + ';font-family:' + bodyCS.fontFamily + ';font-size:' + bodyCS.fontSize + ';';
   const style = document.createElement('style');
   style.textContent = css;
   holder.appendChild(style);
