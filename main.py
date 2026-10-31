@@ -206,7 +206,7 @@ def _load_potential():
 #         23 kill_pve_monster 击杀怪物 · 24 treatmentScore 治疗 · 25 movePoint 移动
 #         26 battleDiceSixCount 骰6 · 27 finalKillBoss 击杀Boss
 # ═══════════════════════════════════════════════════════════════════════
-VERSION = 'v1.2.11'  # 工具版本号
+VERSION = 'v1.2.12'  # 工具版本号
 REPLAY_DIR = DATA_DIR / 'replays'
 # 回放服务器按区服分，两服的**回放号互不相通**（拿一边的号查另一边一律 404）。
 # 登录时按 profile.region 设一次 REPLAY_REGION，之后全程跟着走 ——

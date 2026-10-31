@@ -464,6 +464,108 @@ def catalog_keys(cache, prefixes=(PREFIX_AV, PREFIX_PH)):
     return cat.name, sorted(keys)
 
 
+_CATALOG_MAP = {}
+
+
+def all_caches():
+    """所有已安装客户端的 com.unity.addressables 目录（当前区服排最前）。"""
+    out, seen = [], set()
+    bases = []
+    up = os.environ.get('USERPROFILE')
+    if up:
+        bases.append(Path(up) / 'AppData/LocalLow')
+    la = os.environ.get('LOCALAPPDATA')
+    if la:
+        bases.append(Path(la).parent / 'LocalLow')
+    first = find_cache()
+    cands = [first] if first else []
+    for b in bases:
+        try:
+            cands.extend(sorted((b / 'feimo').glob('*/com.unity.addressables')))
+        except Exception:
+            continue
+    for c in cands:
+        try:
+            k = os.path.normcase(os.path.abspath(str(c)))
+        except Exception:
+            continue
+        if k in seen or not c.is_dir():
+            continue
+        seen.add(k)
+        if next(c.glob('catalog_*.json'), None):
+            out.append(c)
+    return out
+
+
+def catalog_resolve(cache=None) -> dict:
+    """全部已装客户端的 catalog 合并表（当前区服优先），单客户端时等价于只读一份。"""
+    if cache is not None:
+        return _catalog_map_one(cache)
+    merged = {}
+    for c in all_caches():
+        for k, v in _catalog_map_one(c).items():
+            merged.setdefault(k, v)
+    return merged
+
+
+def _catalog_map_one(cache=None) -> dict:
+    """从最新 catalog_*.json 解出「资源名 → 包文件名」。
+
+    地址表里每个 key 的 bucket → entry → dependencyKey 就是承载它的 bundle，
+    比扫包快几个数量级。解析失败就返回空 dict，调用方回退到扫描。
+    """
+    cache = cache or find_cache()
+    if not cache:
+        return {}
+    cats = sorted(Path(cache).glob('catalog_*.json'))
+    if not cats:
+        return {}
+    cat = cats[-1]
+    key = str(cat)
+    if key in _CATALOG_MAP:
+        return _CATALOG_MAP[key]
+    try:
+        data = json.loads(cat.read_text(encoding='utf-8-sig'))
+        kb = base64.b64decode(data['m_KeyDataString'])
+        bb = base64.b64decode(data['m_BucketDataString'])
+        eb = base64.b64decode(data['m_EntryDataString'])
+
+        import struct
+        n = struct.unpack_from('<i', kb, 0)[0]
+        off, keys = 4, []
+        for _ in range(n):
+            typ = kb[off]
+            off += 1
+            ln = struct.unpack_from('<i', kb, off)[0]
+            off += 4
+            keys.append(kb[off:off + ln].decode('utf-8', 'ignore') if typ == 0 else '')
+            off += ln
+
+        ec = struct.unpack_from('<i', eb, 0)[0]
+        entries = [struct.unpack_from('<7i', eb, 4 + i * 28) for i in range(ec)]
+
+        nb = struct.unpack_from('<i', bb, 0)[0]
+        off, out = 4, {}
+        prefixes = (PREFIX_AV, PREFIX_PH, 'UT_Hero_Bust', 'UT_Hero_Card')
+        for _ in range(nb):
+            koff, cnt = struct.unpack_from('<2i', bb, off)
+            off += 8
+            eidx = struct.unpack_from('<%di' % cnt, bb, off)
+            off += 4 * cnt
+            ln = struct.unpack_from('<i', kb, koff + 1)[0]
+            name = kb[koff + 5:koff + 5 + ln].decode('utf-8', 'ignore')
+            if not name.startswith(prefixes) or not eidx:
+                continue
+            dep = entries[eidx[0]][2]
+            if dep >= 0:
+                out[name] = keys[dep]
+        _CATALOG_MAP[key] = out
+        return out
+    except Exception:
+        _CATALOG_MAP[key] = {}
+        return {}
+
+
 def wanted(hero_ids, cache):
     """算出「需要的资源名 → 落盘 tag」。只认角色编号型，避开地图图标等同前缀资源。"""
     ids = {str(int(h)) for h in hero_ids if h}
@@ -599,6 +701,31 @@ def _scan_one(path):
 
 # ══════════════════ 主流程 ══════════════════
 
+def _art_probe(path: str) -> bool:
+    """包头 8KB 里有没有头像/立绘资源名（名字都在 ~2.4KB 内）。"""
+    try:
+        with open(path, 'rb') as f:
+            head = f.read(8192)
+        return (b'UT_Platform_' in head) or (b'UT_Hero_ProfilePhoto' in head)
+    except Exception:
+        return False
+
+
+def _art_probe_file():
+    from . import paths
+    return paths.DATA_DIR / 'art_probe.json'
+
+
+def _load_art_probe(catalog: str) -> dict:
+    try:
+        d = json.loads(_art_probe_file().read_text(encoding='utf-8'))
+        if d.get('catalog') == catalog and isinstance(d.get('files'), dict):
+            return d
+    except Exception:
+        pass
+    return {'catalog': catalog, 'files': {}}
+
+
 def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE, ph_size=PH_SIZE,
            workers=None, save_state=True, ignore_watermark=False, order='mtime'):
     """确保 userdata/assets 里备齐 hero_ids 的角色头像与立绘头像。
@@ -676,8 +803,67 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
     fresh = list(files) if ignore_watermark else [(p, mt) for p, mt in files if mt > wm]
     if order == 'size':
         fresh.sort(key=lambda it: it[0].stat().st_size if hasattr(it[0], 'stat') else 0)
+
+    # ── ① catalog 直接查「资源名 → 包」：命中就只解析这几个包 ──
+    cat_map = catalog_resolve(cache)
+    bpaths = _bundle_path_map()
+    direct, unresolved = [], []
+    for key in todo:
+        pth = bpaths.get(cat_map.get(key) or '')
+        if pth and Path(pth).is_file():
+            direct.append(Path(pth))
+        else:
+            unresolved.append(key)
+    uniq, seen_names = [], set()
+    for pth in direct:
+        sig = (pth.name, pth.stat().st_size)
+        if sig in seen_names:
+            continue
+        seen_names.add(sig)
+        uniq.append(pth)
+    direct = uniq
+
+    # ── ② catalog 没覆盖到的键，才回退扫描 ──
+    extra, skipped = [], 0
+    if unresolved:
+        if cat_map and any(k.startswith(PREFIX_AV) for k in cat_map):
+            # 有 catalog 兜底：包头预筛只用来找明文立绘，头像反正已经定位过了
+            probe = _load_art_probe(catname)
+            probe_changed = False
+            for pth, mt in fresh:
+                try:
+                    sz = pth.stat().st_size
+                except OSError:
+                    continue
+                sig = (pth.name, sz)
+                if sig in seen_names:
+                    continue
+                rec = probe['files'].get(pth.name)
+                if rec and rec[0] == sz and abs(rec[1] - mt) < 1e-6:
+                    hit = bool(rec[2])
+                else:
+                    hit = _art_probe(str(pth))
+                    probe['files'][pth.name] = [sz, mt, hit]
+                    probe_changed = True
+                if hit:
+                    extra.append((pth, mt))
+            if probe_changed:
+                try:
+                    f = _art_probe_file()
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    f.write_text(json.dumps(probe, ensure_ascii=False), encoding='utf-8')
+                except Exception:
+                    pass
+            skipped = len(fresh) - len(extra)
+        else:
+            # catalog 完全解不出来：头像资源名在冷包里是压缩的，预筛会漏，
+            # 这种情况宁可慢也不能少图，直接全量扫。
+            extra = list(fresh)
+
+    fresh = [(pth, pth.stat().st_mtime) for pth in direct] + extra
     n_total = len(fresh)
-    say('准备提取头像资源…', 0, n_total)
+    say('准备提取头像资源…（catalog 定位 %d 个包%s）'
+        % (len(direct), ('，预筛掉 %d 个无关包' % skipped) if skipped else ''), 0, n_total)
 
     found, stopped, done_n = 0, False, 0
 
@@ -696,9 +882,13 @@ def ensure(hero_ids, progress=None, force=False, budget_s=None, av_size=AV_SIZE,
     try:
         from concurrent.futures import ProcessPoolExecutor
         workers = int(workers) if workers else max(1, min(WORKERS_MAX, (os.cpu_count() or 4) - 1))
-        pool = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
-                                   initargs=(dict(todo), dirs, av_size, ph_size))
-        say('正在从本机游戏提取头像资源…（%d 进程并行，共 %d 个资源包）' % (workers, n_total), 0, n_total)
+        # catalog 定位后通常只剩几十个包，开进程池的启动开销比扫描本身还大
+        if n_total >= 64:
+            pool = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
+                                       initargs=(dict(todo), dirs, av_size, ph_size))
+            say('正在从本机游戏提取头像资源…（%d 进程并行，共 %d 个资源包）' % (workers, n_total), 0, n_total)
+        else:
+            say('正在从本机游戏提取头像资源…（%d 个资源包）' % n_total, 0, n_total)
     except Exception:
         pool = None
         say('并行不可用，改用单进程扫描…', 0, n_total)
@@ -939,34 +1129,135 @@ def _bust_scan_one(path: str) -> dict:
     return out
 
 
-def build_bust_index(on_progress=None, workers: int = 8) -> dict:
-    """全量扫一遍资源包，建「资源名 → 包文件名」索引。
+def _bust_probe(path: str) -> bool:
+    """只看包头 8KB：立绘/卡面资源名就在 2.4KB 内，没必要把 57GB 全读一遍。"""
+    try:
+        with open(path, 'rb') as f:
+            head = f.read(8192)
+        return (b'UT_Hero_Bust' in head) or (b'UT_Hero_Card' in head)
+    except Exception:
+        return False
 
-    只在游戏更新（catalog 版本变了）或索引缺失时需要跑；约 2~3 分钟。
+
+def _probe_cache_file():
+    from . import paths
+    return paths.DATA_DIR / 'bust_probe.json'
+
+
+def _load_probe_cache(catalog: str) -> dict:
+    try:
+        p = _probe_cache_file()
+        d = json.loads(p.read_text(encoding='utf-8'))
+        if d.get('catalog') == catalog and isinstance(d.get('files'), dict):
+            return d
+    except Exception:
+        pass
+    return {'catalog': catalog, 'files': {}}
+
+
+def build_bust_index(on_progress=None, workers: int = 8) -> dict:
+    """建「立绘/卡面资源名 → 包文件名」索引，只解析真正含立绘的包。
+
+    以前是 14k 个包全部 UnityPy.load（2~3 分钟）。实测资源名在包头 2KB 左右，
+    所以先读 8KB 预筛（约 10 秒），再只解析命中的几百个包；
+    跨安装目录的重复包按文件名去重，预筛结果按 mtime 缓存，第二次起几乎瞬间完成。
     """
     cache = find_cache()
-    installs = all_installs()                     # 扫描全部客户端安装目录
-    files = [str(p) for p, _ in bundle_files(cache, installs)]
+    installs = all_installs()
+    raw = [p for p, _ in bundle_files(cache, installs)]
+    uniq = {}
+    for p in raw:                      # 同名同大小视为同一份内容；大小不同则都保留
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        uniq.setdefault((p.name, st.st_size), p)
+    files = list(uniq.values())
+    catalog = _current_catalog()
+
+    # ① 先看 catalog 能不能直接给出「资源名 → 包」：能就完全不用扫
+    cat_map = catalog_resolve(cache)
+    bpaths = _bundle_path_map()
+    direct = {}
+    for key, bn in cat_map.items():
+        if not (key.startswith(BUST_PREFIX) or key.startswith(CARD_PREFIX)):
+            continue
+        pth = bpaths.get(bn)
+        if pth and Path(pth).is_file():
+            direct[key] = bn
+    if direct:
+        sig, n = install_sig()
+        data = {'catalog': catalog, 'map': direct, 'sig': sig, 'packs': n,
+                'built_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'catalog'}
+        try:
+            f = _bust_index_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+        except Exception:
+            pass
+        if on_progress:
+            try:
+                on_progress(1, 1)
+            except Exception:
+                pass
+        return data
+
+    probe = _load_probe_cache(catalog)
+
+    cand, changed = [], False
+    for p in files:
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        rec = probe['files'].get(p.name)
+        if rec and rec[0] == st.st_size and abs(rec[1] - st.st_mtime) < 1e-6:
+            hit = bool(rec[2])
+        else:
+            hit = _bust_probe(str(p))
+            probe['files'][p.name] = [st.st_size, st.st_mtime, hit]
+            changed = True
+        if hit:
+            cand.append(str(p))
+
+    if changed:
+        try:
+            f = _probe_cache_file()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(probe, ensure_ascii=False), encoding='utf-8')
+        except Exception:
+            pass
+
+    total = len(files) + len(cand)
     hits: dict = {}
     done = 0
+    if on_progress:
+        try:
+            on_progress(len(files), total)     # 预筛完成，开始解析命中包
+        except Exception:
+            pass
+
     from concurrent.futures import ProcessPoolExecutor
-    with ProcessPoolExecutor(max_workers=workers) as ex:
-        for res in ex.map(_bust_scan_one, files, chunksize=8):
-            done += 1
-            if res:
-                hits.update(res)
-            if on_progress and (done % 200 == 0 or done == len(files)):
-                try:
-                    on_progress(done, len(files))
-                except Exception:
-                    pass
+    if cand:
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            for res in ex.map(_bust_scan_one, cand, chunksize=4):
+                done += 1
+                if res:
+                    hits.update(res)
+                if on_progress and (done % 50 == 0 or done == len(cand)):
+                    try:
+                        on_progress(len(files) + done, total)
+                    except Exception:
+                        pass
+
     sig, n = install_sig()
-    data = {'catalog': _current_catalog(), 'map': hits, 'sig': sig, 'packs': n,
+    data = {'catalog': catalog, 'map': hits, 'sig': sig, 'packs': n,
             'built_at': time.strftime('%Y-%m-%d %H:%M:%S')}
     try:
-        p = _bust_index_file()
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+        f = _bust_index_file()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
     except Exception:
         pass
     return data
