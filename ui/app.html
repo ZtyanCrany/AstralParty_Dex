@@ -2152,7 +2152,7 @@ function renderSkins(d){
   syncStabThumb();
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
-// ── 皮肤立绘大图（beta）：首次要先建索引（扫冷包，Steam 2~3 分钟 / 渠道版 3~5 分钟）──
+// ── 皮肤立绘大图：首次要先建索引（catalog 定位，通常几秒）──
 window.__bustCache = window.__bustCache || {};
 window.openBust = async (el) => {
   const hid = Number(el.dataset.hid || 0);
@@ -2203,12 +2203,12 @@ window.openBust = async (el) => {
     let idx = await window.pywebview.api.bust_index(true);
     const t0 = Date.now();
     while((!idx.ready || idx.stale) && idx.building && Date.now() - t0 < 300000){
-      const tot = idx.total ? ('/' + idx.total) : '';
+      const pct = idx.total ? Math.min(99, Math.floor((idx.done || 0) * 100 / idx.total)) : 0;
+      const tail = idx.total ? ('… ' + pct + '%') : '…';
       st.textContent = (idx.ready
-           ? '客户端有变化，正在重建立绘索引（约 2~5 分钟）：'
-           : '首次使用要先扫一遍本机游戏资源（Steam 版约 2~3 分钟、渠道版约 3~5 分钟，只需一次）：')
-                     + (idx.done || 0) + tot + ' 个包';
-      await new Promise(r => setTimeout(r, 1500));
+           ? '客户端有变化，正在重建立绘索引'
+           : '首次查看需要解析本机立绘资源') + tail;
+      await new Promise(r => setTimeout(r, 700));
       idx = await window.pywebview.api.bust_index(false);
     }
     if(!idx.ready){

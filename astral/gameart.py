@@ -1176,15 +1176,29 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
     catalog = _current_catalog()
 
     # ① 先看 catalog 能不能直接给出「资源名 → 包」：能就完全不用扫
+    def _rep(v):
+        if not on_progress:
+            return
+        try:
+            on_progress(int(v), 100)
+        except Exception:
+            pass
+
+    _rep(5)
     cat_map = catalog_resolve(cache)
+    _rep(25)
     bpaths = _bundle_path_map()
+    _rep(40)
+    keys = [k for k in cat_map if k.startswith(BUST_PREFIX) or k.startswith(CARD_PREFIX)]
     direct = {}
-    for key, bn in cat_map.items():
-        if not (key.startswith(BUST_PREFIX) or key.startswith(CARD_PREFIX)):
-            continue
+    step = max(1, len(keys) // 30)
+    for i, key in enumerate(keys):
+        bn = cat_map[key]
         pth = bpaths.get(bn)
         if pth and Path(pth).is_file():
             direct[key] = bn
+        if i % step == 0:
+            _rep(40 + 45 * i / max(1, len(keys)))
     if direct:
         sig, n = install_sig()
         data = {'catalog': catalog, 'map': direct, 'sig': sig, 'packs': n,
@@ -1196,11 +1210,7 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
             f.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
         except Exception:
             pass
-        if on_progress:
-            try:
-                on_progress(1, 1)
-            except Exception:
-                pass
+        _rep(100)
         return data
 
     probe = _load_probe_cache(catalog)
