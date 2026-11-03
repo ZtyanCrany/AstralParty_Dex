@@ -1138,6 +1138,14 @@
                      box-shadow:0 10px 22px rgba(74,58,42,.10), 0 2px 6px rgba(74,58,42,.06); }
   .bustright .print img{ display:block; max-height:31vh; max-width:47vw; border-radius:0;
                          filter:drop-shadow(0 2px 6px rgba(74,58,42,.10)); }
+  .bustright .cgmiss{ display:none; align-items:center; justify-content:center;
+                      width:min(47vw,520px); height:min(63vh,640px); min-height:200px;
+                      border:1px dashed var(--line); border-radius:14px;
+                      color:var(--dim); font-size:13px; line-height:1.9; text-align:center; }
+  .bustleft .cardmiss{ display:none; align-items:center; justify-content:center;
+                       width:min(40vw,460px); height:min(70vh,660px); min-height:220px;
+                       border:1px dashed var(--line); border-radius:14px;
+                       color:var(--dim); font-size:13px; line-height:1.9; text-align:center; }
   /* 字幕：上下两行 + 左侧强调条（横排无论怎么调都有空隙，竖排最紧凑）*/
   .bust .bcap{ display:flex; align-items:stretch; gap:10px; padding:6px 16px 7px 0;
                border-radius:10px; background:rgba(18,16,14,.52);
@@ -1290,10 +1298,11 @@
   <div class="bustbg" id="bustBg"></div>
   <div class="bx" onclick="closeBust()">✕</div>
   <div class="bustbody">
-    <div class="bustleft"><img id="artCard" alt="" style="display:none" /><i class="bustshade"></i></div>
+    <div class="bustleft"><img id="artCard" alt="" style="display:none" /><figure class="cardmiss" id="artCardMiss">未获取到本机对应资源，可能是未下载</figure><i class="bustshade"></i></div>
     <div class="bustright">
       <figure class="print"><img id="artCg0" alt="" style="display:none" /></figure>
       <figure class="print"><img id="artCg1" alt="" style="display:none" /></figure>
+      <figure class="cgmiss" id="artCgMiss">未获取到本机对应资源，可能是未下载</figure>
     </div>
   </div>
   <div class="bcap" id="bustCap"></div>
@@ -2172,6 +2181,10 @@ window.openBust = async (el) => {
                 + '<span class="sn">' + _e(nm) + '</span></div>';
   st.textContent = '正在从本机游戏资源里取图…';
   Object.values(imgs).forEach(i => { i.style.display = 'none'; i.removeAttribute('src'); });
+  const miss = document.getElementById('artCgMiss');
+  if(miss) miss.style.display = 'none';
+  const cardMiss = document.getElementById('artCardMiss');
+  if(cardMiss) cardMiss.style.display = 'none';
   document.querySelectorAll('.bustright .print').forEach(f => { f.style.display = 'none'; });
   const shade = document.querySelector('.bustleft .bustshade');
   if(shade) shade.style.opacity = '0';
@@ -2183,9 +2196,14 @@ window.openBust = async (el) => {
     let n = 0;
     const bg = document.getElementById('bustBg');
     if(bg && data && (data.cg0 || data.card)) bg.style.backgroundImage = 'url("' + (data.cg0 || data.card) + '")';
-    for(const k of ['card', 'cg0', 'cg1']){
-      const url = data && data[k];
-      if(!url) continue;
+    const keys = ['card', 'cg0', 'cg1'].filter(k => data && data[k]);
+    const hasCg = keys.some(k => k === 'cg0' || k === 'cg1');
+    if(cardMiss) cardMiss.style.display = keys.includes('card') ? 'none' : 'flex';
+    if(miss) miss.style.display = hasCg ? 'none' : 'flex';
+    st.textContent = '';
+    if(!keys.length) return;
+    for(const k of keys){
+      const url = data[k];
       imgs[k].onload = () => { imgs[k].style.display = 'block';
                                const fr = imgs[k].closest('.print');
                                if(fr) fr.style.display = 'block';
@@ -2193,7 +2211,7 @@ window.openBust = async (el) => {
                                  const sh = document.querySelector('.bustleft .bustshade');
                                  if(sh) sh.style.opacity = '1';
                                }
-                               n++; if(n >= 3) st.textContent = ''; };
+                               n++; if(n >= keys.length) st.textContent = ''; };
       imgs[k].src = url;
     }
   };
@@ -2218,7 +2236,11 @@ window.openBust = async (el) => {
     }
     const data = await window.pywebview.api.skin_art(hid, seq);
     if(!data || !data.ok){
-      st.textContent = (data && data.msg) || '取图失败';
+      const rebuild = data && (data.need_rebuild || data.need_index);
+      if(rebuild){ st.textContent = (data && data.msg) || '取图失败'; return; }
+      if(cardMiss) cardMiss.style.display = 'flex';
+      if(miss) miss.style.display = 'flex';
+      st.textContent = '';
       return;
     }
     window.__bustCache[key] = data;

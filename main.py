@@ -1585,7 +1585,8 @@ class Api:
                 pass
             return {'ok': False, 'need_index': need, 'need_rebuild': stale,
                     'msg': ('游戏更新过、或换过客户端，立绘索引要重建（约 2~5 分钟）' if stale
-                            else '本机游戏资源里没找到这张立绘')}
+                            else ('本机资源里没有这套皮肤的进战 CG（游戏里可能还没下载）'
+                                  if int(seq or 1) > 1 else '本机游戏资源里没找到这张立绘'))}
         try:
             import base64
             return {'ok': True, 'key': p.stem,

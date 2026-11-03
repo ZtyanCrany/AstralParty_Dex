@@ -1353,7 +1353,11 @@ def _bonded(m, prefix, hid) -> bool:
 
 
 def bust_png(hero_id, seq: int = 1, width: int = BUST_WIDTH, variant: int = 0):
-    """进战 CG：每个皮肤两张（_0 / _1），variant 选哪张。"""
+    """进战 CG：每个皮肤两张（_0 / _1），variant 选哪张。
+
+    只有在「初始皮肤」才允许回退到初始 bust；名皮/羁绊缺图时返回 None，
+    否则会把初始皮肤的 CG 当成这套皮肤的 CG（117_04 就是这样重复显示了两张初始图）。
+    """
     m = (_load_bust_index().get('map') or {})
     hid = int(hero_id or 0)
     has_bond = _bonded(m, BUST_PREFIX, hid)
@@ -1361,7 +1365,9 @@ def bust_png(hero_id, seq: int = 1, width: int = BUST_WIDTH, variant: int = 0):
     stem, _, tail = base.rpartition('_')          # ..._01 + '0'
     alt = stem + '_1'
     order = (base, alt) if variant == 0 else (alt, base)
-    key = _pick(m, *order, '%s%d_0' % (BUST_PREFIX, hid))
+    key = _pick(m, *order)
+    if not key and int(seq or 1) <= 1:
+        key = _pick(m, '%s%d_0' % (BUST_PREFIX, hid))
     if not key:
         return None
     return _render(key, m[key], width)
@@ -1389,7 +1395,14 @@ def card_png(hero_id, seq: int = 1, width: int = CARD_WIDTH):
 
 
 def skin_art(hero_id, seq: int = 1) -> dict:
-    """一套皮肤的完整物料：左立绘 + 右两张进战 CG。返回 {card, cg0, cg1}（路径）。"""
-    return {'card': card_png(hero_id, seq),
-            'cg0': bust_png(hero_id, seq, variant=0),
-            'cg1': bust_png(hero_id, seq, variant=1)}
+    """一套皮肤的完整物料：左立绘 + 右两张进战 CG。返回 {card, cg0, cg1}（路径）。
+
+    名皮缺 bust 时 cg0/cg1 为 None（不再回退成初始皮肤的图）；
+    同一套皮肤只有一张变体时 cg1 置 None，避免界面里出现两张一模一样的 CG。
+    """
+    card = card_png(hero_id, seq)
+    cg0 = bust_png(hero_id, seq, variant=0)
+    cg1 = bust_png(hero_id, seq, variant=1)
+    if cg1 and cg0 and cg1 == cg0:
+        cg1 = None
+    return {'card': card, 'cg0': cg0, 'cg1': cg1}
