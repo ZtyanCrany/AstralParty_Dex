@@ -88,7 +88,12 @@ def card_kinds(card_bytes):
 
 
 def gen_cards(tables, base=None, card_bytes=None):
-    """STRCard：键=卡号→牌名；键=卡号*10+序号→效果文字（取序号 1）。"""
+    """STRCard：键=卡号→牌名；键=卡号*10+序号→效果文字（取序号 1）。
+
+    有些异画卡（例如 20031 活体书页·异画）只有 STRItem[13000000+卡号] 的名字，
+    STRCard 里没有同名键；必须把 STRItem 的异画名补进来，否则复盘手牌会显示
+    「卡牌 20031」。
+    """
     scard = _int_keys(tables.get('STRCard'))
     names, descs = {}, {}
     for kk, v in scard.items():
@@ -98,6 +103,15 @@ def gen_cards(tables, base=None, card_bytes=None):
             head, seq = kk // 10, kk % 10
             if CARD_LO <= head <= CARD_HI:
                 descs.setdefault(head, {})[seq] = v
+
+    # 异画卡：STRItem 的键是 13000000 + 卡号，名字形如「活体书页（异画）」。
+    # 只补 STRCard 没给名字的卡号，已有正式名的不覆盖。
+    sitem = _int_keys(tables.get('STRItem'))
+    for kk, nm in sitem.items():
+        cid = kk - 13000000
+        if 13000000 <= kk < 14000000 and CARD_LO <= cid <= CARD_HI and nm:
+            if not names.get(cid):
+                names[cid] = nm
 
     kinds = card_kinds(card_bytes)
     # 建筑牌的效果文字不在 STRCard 里：STRBuild 里 <id> 是名字、<id*10+1> 是效果，
@@ -127,8 +141,17 @@ def gen_cards(tables, base=None, card_bytes=None):
         gdesc = clean(descs[cid][1]) if descs.get(cid, {}).get(1) else ''
         c = byid.get(cid)
         if c is None:
-            row = {'id': cid, 'name': gname, 'type': kinds.get(cid, 'effect'), 'target': 'Entity',
-                   'desc': gdesc, 'mode': series_mode(cid), 'from': '基础卡牌'}
+            base_c = byid.get(cid - 1)
+            if base_c and family_of(base_c.get('name')) != family_of(gname):
+                base_c = None
+            if not gdesc and base_c:
+                gdesc = str(base_c.get('desc') or '')
+            row = {'id': cid, 'name': gname,
+                   'type': kinds.get(cid) or (base_c or {}).get('type') or 'effect',
+                   'target': (base_c or {}).get('target', 'Entity'),
+                   'desc': gdesc,
+                   'mode': (base_c or {}).get('mode') or series_mode(cid),
+                   'from': (base_c or {}).get('from', '基础卡牌')}
             cards.append(row)
             byid[cid] = row
             added.append((cid, gname, gdesc))

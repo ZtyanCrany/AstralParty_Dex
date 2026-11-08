@@ -31,7 +31,7 @@ FALLBACK_MARKERS = [b'UT_Relic_', b'UT_Skin_', '轨道炮'.encode('utf-8')]
 SCAN_CAPS = (8 * 1024 * 1024, 128 * 1024 * 1024)
 
 # 生成逻辑变更时 +1：老用户手上的表会被判为过期，自动重抽一次
-SCHEMA = 2
+SCHEMA = 3
 
 LIVE_SUBDIR = 'game_live'
 SCAN_CACHE = '_scan.json'
