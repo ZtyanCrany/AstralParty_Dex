@@ -1037,6 +1037,7 @@ def selftest():
 #   之后按需只读那一个包（几十毫秒）。索引随 catalog 版本失效重建。
 BUST_PREFIX = 'UT_Hero_Bust_'
 CARD_PREFIX = 'UT_Hero_Card'   # 角色卡面立绘（含 Card2 变体）
+BUST_INDEX_VERSION = 2         # 索引结构/生成逻辑变更时 +1（旧索引自动重建）
 BUST_WIDTH = 1100
 CARD_WIDTH = 820                   # 预览宽度（原生 1568×900，缩到 1280 约 400KB）
 
@@ -1083,6 +1084,8 @@ def bust_index_stale() -> bool:
       ③ 老索引没有指纹（包括早期随包发出去的那份）→ 按本机情况重扫一次。
     """
     idx = _load_bust_index()
+    if idx.get('v') != BUST_INDEX_VERSION:
+        return True
     cat = _current_catalog()
     if cat and idx.get('catalog') and idx['catalog'] != cat:
         return True
@@ -1199,9 +1202,13 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
             direct[key] = bn
         if i % step == 0:
             _rep(40 + 45 * i / max(1, len(keys)))
-    if direct:
+    # ① catalog 能直接给出「资源名 → 包」时优先用它；但 catalog 里的包名
+    #    不一定等于实际安装包名（117_04 就是这样：catalog 指 c95……，实际包是
+    #    7ef14……）。所以只有**全部** catalog 键都能落到本机包上才走快速路径；
+    #    缺任何一个都继续扫包，不能把不完整的 direct 当成完整索引。
+    if direct and len(direct) >= len(keys):
         sig, n = install_sig()
-        data = {'catalog': catalog, 'map': direct, 'sig': sig, 'packs': n,
+        data = {'v': BUST_INDEX_VERSION, 'catalog': catalog, 'map': direct, 'sig': sig, 'packs': n,
                 'built_at': time.strftime('%Y-%m-%d %H:%M:%S'),
                 'source': 'catalog'}
         try:
@@ -1240,7 +1247,7 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
             pass
 
     total = len(files) + len(cand)
-    hits: dict = {}
+    hits: dict = dict(direct)          # 保留 catalog 已验证到的条目，再补扫包结果
     done = 0
     if on_progress:
         try:
@@ -1262,7 +1269,7 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
                         pass
 
     sig, n = install_sig()
-    data = {'catalog': catalog, 'map': hits, 'sig': sig, 'packs': n,
+    data = {'v': BUST_INDEX_VERSION, 'catalog': catalog, 'map': hits, 'sig': sig, 'packs': n,
             'built_at': time.strftime('%Y-%m-%d %H:%M:%S')}
     try:
         f = _bust_index_file()
