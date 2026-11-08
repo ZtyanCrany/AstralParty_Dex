@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -1037,7 +1038,7 @@ def selftest():
 #   之后按需只读那一个包（几十毫秒）。索引随 catalog 版本失效重建。
 BUST_PREFIX = 'UT_Hero_Bust_'
 CARD_PREFIX = 'UT_Hero_Card'   # 角色卡面立绘（含 Card2 变体）
-BUST_INDEX_VERSION = 2         # 索引结构/生成逻辑变更时 +1（旧索引自动重建）
+BUST_INDEX_VERSION = 3         # 索引结构/生成逻辑变更时 +1（旧索引自动重建）
 BUST_WIDTH = 1100
 CARD_WIDTH = 820                   # 预览宽度（原生 1568×900，缩到 1280 约 400KB）
 
@@ -1158,6 +1159,126 @@ def _load_probe_cache(catalog: str) -> dict:
     return {'catalog': catalog, 'files': {}}
 
 
+_TARGET_LOCK = threading.Lock()
+_TARGET_JOBS: dict = {}
+
+
+def _target_bundle_files():
+    """按需补扫用的包列表：安装包 + 所有客户端热更缓存，按 (文件名, 大小) 去重。"""
+    files, seen = [], set()
+    for c in [find_cache()] + list(all_caches()):
+        if not c:
+            continue
+        for p, _mt in bundle_files(c, []):
+            try:
+                st = p.stat()
+                k = (p.name, st.st_size)
+            except OSError:
+                continue
+            if k not in seen:
+                seen.add(k)
+                files.append(str(p))
+    for d in all_installs() or []:
+        try:
+            for p in Path(d).glob('*.bundle'):
+                st = p.stat()
+                k = (p.name, st.st_size)
+                if k not in seen:
+                    seen.add(k)
+                    files.append(str(p))
+        except Exception:
+            continue
+    return files
+
+
+def _scan_for_targets(keys):
+    """只找指定的几个资源名，找到就停；不重建整张索引。"""
+    remaining = set(keys)
+    found = {}
+    candidates = [path for path in _target_bundle_files() if _bust_probe(path)]
+    if not candidates:
+        return found
+    try:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        workers = min(8, max(1, len(candidates)))
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(_bust_scan_one, path) for path in candidates]
+            for fut in as_completed(futs):
+                try:
+                    res = fut.result()
+                except Exception:
+                    continue
+                for k in list(remaining):
+                    if k in res:
+                        found[k] = res[k]
+                        remaining.discard(k)
+                if not remaining:
+                    for f in futs:
+                        f.cancel()
+                    break
+    except Exception:
+        # 进程池不可用时退回单进程；只在极端环境发生
+        for path in candidates:
+            if not remaining:
+                break
+            try:
+                res = _bust_scan_one(path)
+            except Exception:
+                continue
+            for k in list(remaining):
+                if k in res:
+                    found[k] = res[k]
+                    remaining.discard(k)
+    return found
+
+
+def ensure_bust_keys(keys):
+    """为缺失的立绘键启动一次后台补扫；同一组键只扫一次。"""
+    keys = tuple(sorted({str(k) for k in (keys or []) if k}))
+    if not keys:
+        return {'running': False, 'done': True, 'found': {}}
+    with _TARGET_LOCK:
+        job = _TARGET_JOBS.get(keys)
+        if job:
+            return dict(job)
+        job = {'running': True, 'done': False, 'found': {}}
+        _TARGET_JOBS[keys] = job
+
+    def work():
+        found = {}
+        try:
+            found = _scan_for_targets(keys)
+        except Exception:
+            found = {}
+        if found:
+            try:
+                idx = _load_bust_index()
+                mp = dict(idx.get('map') or {})
+                mp.update(found)
+                idx['map'] = mp
+                idx['v'] = BUST_INDEX_VERSION
+                idx['targeted_at'] = time.strftime('%Y-%m-%d %H:%M:%S')
+                f = _bust_index_file()
+                f.parent.mkdir(parents=True, exist_ok=True)
+                tmp = f.with_name(f.name + '.tmp')
+                tmp.write_text(json.dumps(idx, ensure_ascii=False), encoding='utf-8')
+                os.replace(tmp, f)
+            except Exception:
+                pass
+        with _TARGET_LOCK:
+            job.update(running=False, done=True, found=found)
+
+    threading.Thread(target=work, daemon=True).start()
+    return dict(job)
+
+
+def pending_bust_keys(keys):
+    keys = tuple(sorted({str(k) for k in (keys or []) if k}))
+    with _TARGET_LOCK:
+        job = _TARGET_JOBS.get(keys)
+        return bool(job and job.get('running'))
+
+
 def build_bust_index(on_progress=None, workers: int = 8) -> dict:
     """建「立绘/卡面资源名 → 包文件名」索引，只解析真正含立绘的包。
 
@@ -1202,15 +1323,14 @@ def build_bust_index(on_progress=None, workers: int = 8) -> dict:
             direct[key] = bn
         if i % step == 0:
             _rep(40 + 45 * i / max(1, len(keys)))
-    # ① catalog 能直接给出「资源名 → 包」时优先用它；但 catalog 里的包名
-    #    不一定等于实际安装包名（117_04 就是这样：catalog 指 c95……，实际包是
-    #    7ef14……）。所以只有**全部** catalog 键都能落到本机包上才走快速路径；
-    #    缺任何一个都继续扫包，不能把不完整的 direct 当成完整索引。
-    if direct and len(direct) >= len(keys):
+    # ① catalog 能直接给出「资源名 → 包」时先返回这份快速索引。
+    #    即使只覆盖一部分键，也不在这里全量扫包；缺的键由 skin_art() 按需补扫，
+    #    否则一张钢羽森姬的 CG 会把所有立绘的首次打开都拖慢十几秒。
+    if direct:
         sig, n = install_sig()
         data = {'v': BUST_INDEX_VERSION, 'catalog': catalog, 'map': direct, 'sig': sig, 'packs': n,
                 'built_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'source': 'catalog'}
+                'source': 'catalog-fast', 'partial': len(direct) < len(keys)}
         try:
             f = _bust_index_file()
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -1399,6 +1519,18 @@ def card_png(hero_id, seq: int = 1, width: int = CARD_WIDTH):
     if not key:
         return None
     return _render(key, m[key], width)
+
+
+def skin_keys(hero_id, seq: int = 1) -> dict:
+    """这套皮肤对应的三个资源名（用于按需补扫缺失资源）。"""
+    m = (_load_bust_index().get('map') or {})
+    hid = int(hero_id or 0)
+    card_has = _bonded(m, CARD_PREFIX, hid)
+    bust_has = _bonded(m, BUST_PREFIX, hid)
+    base = bust_key(hid, seq, bust_has)
+    return {'card': card_key(hid, seq, card_has),
+            'cg0': base,
+            'cg1': base.rpartition('_')[0] + '_1'}
 
 
 def skin_art(hero_id, seq: int = 1) -> dict:

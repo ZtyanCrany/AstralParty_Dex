@@ -1597,10 +1597,15 @@ class Api:
 
     # ── 索引 / 回放号 统一解析（复盘查询要用回放号，原「最近对局」用下标）──
     def skin_art(self, hero_id, seq=1):
-        """一套皮肤的全部图（beta）：左立绘 + 右两张进战 CG，返回 data URI。"""
+        """一套皮肤的全部图：左立绘 + 两张进战 CG，返回 data URI。
+
+        先用快速索引返回已有的图；缺的键（例如 117_04 的两张 CG）在后台
+        单独扫包，前端可以先把卡面/已有 CG 显示出来，再等缺失项补齐。
+        """
         from astral import gameart
+        hid, sq = int(hero_id), int(seq)
         try:
-            art = gameart.skin_art(int(hero_id), int(seq))
+            art = gameart.skin_art(hid, sq)
         except Exception as e:
             return {'ok': False, 'msg': str(e)[:100]}
         out = {}
@@ -1608,10 +1613,22 @@ class Api:
             f = art.get(k)
             if f:
                 out[k] = 'data:image/png;base64,' + base64.b64encode(f.read_bytes()).decode('ascii')
-        if not out:
+        missing = []
+        pending = False
+        try:
+            names = gameart.skin_keys(hid, sq)
+            missing = [names[k] for k in ('card', 'cg0', 'cg1') if not art.get(k)]
+            if missing:
+                job = gameart.ensure_bust_keys(missing)
+                pending = bool(job.get('running') or job.get('found'))
+        except Exception:
+            pass
+        if not out and not pending:
             return {'ok': False, 'msg': '本机游戏资源里没找到这套皮肤的图',
                     'need_rebuild': gameart.bust_index_stale()}
         out['ok'] = True
+        out['pending'] = bool(pending)
+        out['pending_keys'] = missing if pending else []
         out['keys'] = {k: (art.get(k).stem if art.get(k) else '') for k in ('card', 'cg0', 'cg1')}
         return out
 

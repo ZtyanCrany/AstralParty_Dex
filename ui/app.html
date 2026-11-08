@@ -2192,15 +2192,16 @@ window.openBust = async (el) => {
   if(bg) bg.style.backgroundImage = '';
 
   const key = 'art-' + hid + '-' + seq;
-  const paint = (data) => {
+  const paint = (data, status = '') => {
     let n = 0;
     const bg = document.getElementById('bustBg');
     if(bg && data && (data.cg0 || data.card)) bg.style.backgroundImage = 'url("' + (data.cg0 || data.card) + '")';
     const keys = ['card', 'cg0', 'cg1'].filter(k => data && data[k]);
     const hasCg = keys.some(k => k === 'cg0' || k === 'cg1');
-    if(cardMiss) cardMiss.style.display = keys.includes('card') ? 'none' : 'flex';
-    if(miss) miss.style.display = hasCg ? 'none' : 'flex';
-    st.textContent = '';
+    const waiting = !!status;
+    if(cardMiss) cardMiss.style.display = (keys.includes('card') || waiting) ? 'none' : 'flex';
+    if(miss) miss.style.display = (hasCg || waiting) ? 'none' : 'flex';
+    st.textContent = status;
     if(!keys.length) return;
     for(const k of keys){
       const url = data[k];
@@ -2211,7 +2212,7 @@ window.openBust = async (el) => {
                                  const sh = document.querySelector('.bustleft .bustshade');
                                  if(sh) sh.style.opacity = '1';
                                }
-                               n++; if(n >= keys.length) st.textContent = ''; };
+                               n++; if(n >= keys.length && !status) st.textContent = ''; };
       imgs[k].src = url;
     }
   };
@@ -2234,7 +2235,7 @@ window.openBust = async (el) => {
                                : '这台机器上没找到游戏资源包（或游戏没安装）';
       return;
     }
-    const data = await window.pywebview.api.skin_art(hid, seq);
+    let data = await window.pywebview.api.skin_art(hid, seq);
     if(!data || !data.ok){
       const rebuild = data && (data.need_rebuild || data.need_index);
       if(rebuild){ st.textContent = (data && data.msg) || '取图失败'; return; }
@@ -2243,8 +2244,21 @@ window.openBust = async (el) => {
       st.textContent = '';
       return;
     }
-    window.__bustCache[key] = data;
-    paint(data);
+    let merged = data;
+    const pendingText = '已显示可用的立绘，正在查找缺失的进战 CG…';
+    if(!data.pending) window.__bustCache[key] = data;
+    paint(merged, data.pending ? pendingText : '');
+    // 缺的那几张单独补扫；已有的图先留在屏幕上，不要整页等
+    const t1 = Date.now();
+    while(merged.pending && Date.now() - t1 < 90000){
+      await new Promise(r => setTimeout(r, 900));
+      const more = await window.pywebview.api.skin_art(hid, seq);
+      if(!more || !more.ok) break;
+      merged = Object.assign({}, merged, more);
+      if(!more.pending) window.__bustCache[key] = merged;
+      paint(merged, more.pending ? pendingText : '');
+      if(!more.pending) break;
+    }
   }catch(e){
     st.textContent = '取图出错：' + (e && e.message ? e.message : e);
   }
