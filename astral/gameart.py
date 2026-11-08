@@ -1476,7 +1476,17 @@ def _bonded(m, prefix, hid) -> bool:
     漏判会让「羁绊」错拿到 `_01`（名皮）、后面的名皮再整体错位。
     """
     head = '%s_%d_Max' % (prefix.rstrip('_'), int(hid or 0))
-    return any(k == head or k.startswith(head + '_') for k in m)
+    if any(k == head or k.startswith(head + '_') for k in m):
+        return True
+    # 快速索引可能是部分的（例如某个 CG 包名对不上 catalog），
+    # 此时不能因为 map 里暂时没有 _Max 就把整只角色的槽位算错。
+    try:
+        cat = catalog_resolve(find_cache())
+        if any(k == head or k.startswith(head + '_') for k in cat):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def bust_png(hero_id, seq: int = 1, width: int = BUST_WIDTH, variant: int = 0):
