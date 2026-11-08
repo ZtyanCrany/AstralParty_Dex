@@ -9,8 +9,9 @@
 
 设计要点：
 · cond 是本局累计 → 每轮数据 = 本轮末快照 − 上轮末快照
-· 死亡 = 该轮 total_die 增量（可 >1，一轮内死两次不合并）；died 只是「本轮死过」的标记
-· selfDie 不计入死亡：结算界面的「死亡」列就是 total_die，两者相加会与官方数字对不上
+· 死亡 = 该轮 total_die + selfDie 增量（可 >1，一轮内死两次不合并）；died 只是「本轮死过」的标记
+· 游戏结算的「倒下」包含 selfDie（自杀/自爆），不能只累加 total_die
+· 终局倒下可能落在最后一个快照之后或被结算重置吞掉：末帧 0 HP 且计数没再涨时补 1 次
 · 残轮（击败 BOSS 即结束）属正常情况，不产生告警
 · 筹码来源三条路：同帧多人=任务 / 单独=升星 / buyRelicNum 增长帧=商店
 """
@@ -571,7 +572,9 @@ def _rounds_for(rp, uid):
             return v.get(k, 0) - (prev.get(k, 0) if prev else 0)
         kill = d('kill_count') + d('kill_pve_monster') + d('kill_thief')
         gold = d('gold') + (init_gold if rnd == 1 else 0)
-        deaths = max(d('total_die'), 0)
+        # 游戏结算的「倒下」= total_die + selfDie；selfDie 是自杀/自爆类
+        # 死亡，total_die 不包含它（20031 那把邦妮就是 selfDie 1 + total_die 2）。
+        deaths = max(d('total_die'), 0) + max(d('selfDie'), 0)
         rows.append({
             'round': rnd,
             'kill': max(kill, 0), 'dmg': max(d('total_damage'), 0),
@@ -581,6 +584,27 @@ def _rounds_for(rp, uid):
             'died': deaths > 0, 'deaths': deaths,
         })
         prev = v
+
+    # 终局补刀：最后一帧角色已 0 HP，但 total_die/selfDie 没在末帧再涨，
+    # 说明这次「倒下」发生在快照之后或被结算重置吞掉了（凛那把就是）。
+    last = prev_last = None
+    for fi, fr in enumerate(rp.frames):
+        for pl in fr['room'].players:
+            if pl.id != uid or getattr(pl.hero, 'teamId', 0) == 0:
+                continue
+            c = pl.hero.cond
+            vals = {'total_die': int(getattr(c, 'total_die', 0) or 0),
+                    'selfDie': int(getattr(c, 'selfDie', 0) or 0),
+                    'hp': int(getattr(pl.hero, 'hp', 0) or 0)}
+            if not any(vals[k] for k in ('total_die', 'selfDie')) and vals['hp'] > 0:
+                continue
+            prev_last, last = last, (fi, vals)
+    if last and prev_last and last[0] >= max(0, len(rp.frames) - 3):
+        if last[1]['hp'] <= 0 and last[1]['total_die'] == prev_last[1]['total_die'] \
+                and last[1]['selfDie'] == prev_last[1]['selfDie']:
+            rows[-1]['deaths'] += 1
+            rows[-1]['died'] = True
+
     total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move', 'transfer', 'tret')}
     total['died'] = sum(r['deaths'] for r in rows)   # 次数而非「死过的轮数」
 
