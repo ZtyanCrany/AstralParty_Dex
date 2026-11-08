@@ -2481,7 +2481,7 @@ window.cmpTable = (rv) => {
   if(!ps.length || !ps[0].score) return '<div class="rvfoot">这局没有可对比的评分数据</div>';
   const ref = ps[0].score.parts || [];
   const fmt = (key, x) => {
-    if(key === 'surv') return (x && x.deaths != null) ? x.deaths + ' 次' : '—';
+    if(key === 'surv') return (x && x.deaths != null) ? String(x.deaths) : '—';
     if(key === 'eff')  return Number((x && x.raw) || 0).toFixed(2);
     return String((x && x.raw) || 0);
   };
@@ -2511,9 +2511,7 @@ window.cmpTable = (rv) => {
       const hot = best > 1.02 && Math.abs((x.ratio || 0) - best) < 1e-9;
       const sub = (r.key === 'eff')
         ? '<span class="cmx">(' + Number((p.totals || {}).dmg || 0) + '/' + Number((p.totals || {}).gold || 0) + ')</span>'
-        : (r.key === 'surv')
-          ? '<span class="cmx">(存活 ' + Math.round(Number((p.totals || {}).surv_rate || 0) * 100) + '%)</span>'
-          : '';
+        : '';
       body += '<td class="' + (hot ? 'win' : '') + '">' +
         '<span class="cmv">' + esc(fmt(r.key, x)) + '</span>' + sub + '</td>';
     });
@@ -2532,8 +2530,6 @@ window.cmpTable = (rv) => {
     '<div>1 号位：治疗、转账 ×1.45，输出 ×0.75，击杀 ×0.80，倒下 ×0.90<br>' +
     '2 号位：治疗 ×1.10，转账 ×1.15，输出与击杀不调整，倒下 ×0.95<br>' +
     '3 / 4 号位（双主 C，完全一致）：输出 ×1.15，击杀 ×1.12，转账 ×0.55，治疗 ×0.50，倒下 ×1.15</div>' +
-    '<div class="cmfh">倒下次数</div>' +
-    '<div>0 / 1 / 2 / 3 / 4 / 5 次 → 1.00 / 0.90 / 0.60 / 0.32 / 0.12 / 0；死一次可能只是和 BOSS 交换，两次以上开始明显扣分，4~5 次基本把雪球滚起来。</div>' +
     '<div class="cmfh">为什么要 ÷0.80</div>' +
     '<div>内部评分队内均值恒为 1.000；÷0.80 只是换显示口径，让 1.00 = 及格线、1.25 ≈ 队内平均，排序与倍率都不变。</div>' +
     '</div></details>';
