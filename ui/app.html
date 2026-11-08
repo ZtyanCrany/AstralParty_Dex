@@ -2480,10 +2480,10 @@ window.cmpTable = (rv) => {
   const ps = (rv.players || []).slice().sort((a, b) => (a.slot == null ? 9 : a.slot) - (b.slot == null ? 9 : b.slot));
   if(!ps.length || !ps[0].score) return '<div class="rvfoot">这局没有可对比的评分数据</div>';
   const ref = ps[0].score.parts || [];
-  const fmt = (key, raw) => {
-    if(key === 'surv') return Math.round(Number(raw) * 100) + '%';
-    if(key === 'eff')  return Number(raw).toFixed(2);
-    return String(raw);
+  const fmt = (key, x) => {
+    if(key === 'surv') return (x && x.deaths != null) ? x.deaths + ' 次' : '—';
+    if(key === 'eff')  return Number((x && x.raw) || 0).toFixed(2);
+    return String((x && x.raw) || 0);
   };
   let head = '<tr><th class="cmk">评分</th>';
   ps.forEach(p => {
@@ -2507,13 +2507,15 @@ window.cmpTable = (rv) => {
     body += '<tr><th class="cmk">' + esc(r.label) +
       (r.note ? '<i class="cmnote">（' + esc(r.note) + '）</i>' : '') + '</th>';
     ps.forEach(p => {
-      const x = (p.score.parts || []).find(y => y.key === r.key) || { raw: 0, ratio: 1 };
+      const x = (p.score.parts || []).find(y => y.key === r.key) || { raw: 0, ratio: 1, deaths: null };
       const hot = best > 1.02 && Math.abs((x.ratio || 0) - best) < 1e-9;
       const sub = (r.key === 'eff')
         ? '<span class="cmx">(' + Number((p.totals || {}).dmg || 0) + '/' + Number((p.totals || {}).gold || 0) + ')</span>'
-        : '';
+        : (r.key === 'surv')
+          ? '<span class="cmx">(存活 ' + Math.round(Number((p.totals || {}).surv_rate || 0) * 100) + '%)</span>'
+          : '';
       body += '<td class="' + (hot ? 'win' : '') + '">' +
-        '<span class="cmv">' + esc(fmt(r.key, x.raw || 0)) + '</span>' + sub + '</td>';
+        '<span class="cmv">' + esc(fmt(r.key, x)) + '</span>' + sub + '</td>';
     });
     body += '</tr>';
   });
@@ -2522,14 +2524,16 @@ window.cmpTable = (rv) => {
     '<details class="cmf"><summary>评分是怎么算的</summary>' +
     '<div class="cmfbody">' +
     '<div><b>综合评分</b> = Σ（权重 × 位置倾斜 × 相对倍率）÷ 队内均值 ÷ 0.80</div>' +
-    '<div><b>相对倍率</b> = （个人数值 + 0.6 × 队内均值）÷（1.6 × 队内均值），单项上限 2.60</div>' +
-    '<div class="cmfnote">0.6 倍均值是保底项：某一项完全没做也不会直接扣成 0。</div>' +
+    '<div><b>相对倍率</b> = （个人数值 + 先验 × 队内均值）÷（（1+先验）× 队内均值），普通项先验 0.6、倒下项 0.25，单项上限 2.60</div>' +
+    '<div class="cmfnote">普通项 0.6 倍均值是保底项；倒下项保底降到 0.25，避免 4~5 次倒下被抬回及格线。</div>' +
     '<div class="cmfh">权重</div>' +
-    '<div>伤害转化率 19.4% · 输出伤害 16.1% · 转账 16.1% · 击杀 14.0% · 治疗 10.8% · 存活时间 10.8% · 有效承伤 7.5% · 移动步数 5.4%</div>' +
+    '<div>伤害转化率 18.4% · 输出伤害 15.3% · 转账 15.3% · 击杀 13.3% · 治疗 10.2% · 倒下次数 15.3% · 有效承伤 7.1% · 移动步数 5.1%</div>' +
     '<div class="cmfh">位置倾斜</div>' +
-    '<div>1 号位：治疗、转账 ×1.45，输出 ×0.75，击杀 ×0.80<br>' +
-    '2 号位：治疗 ×1.10，转账 ×1.15，输出与击杀不调整<br>' +
-    '3 / 4 号位（双主 C，完全一致）：输出 ×1.15，击杀 ×1.12，转账 ×0.55，治疗 ×0.50</div>' +
+    '<div>1 号位：治疗、转账 ×1.45，输出 ×0.75，击杀 ×0.80，倒下 ×0.90<br>' +
+    '2 号位：治疗 ×1.10，转账 ×1.15，输出与击杀不调整，倒下 ×0.95<br>' +
+    '3 / 4 号位（双主 C，完全一致）：输出 ×1.15，击杀 ×1.12，转账 ×0.55，治疗 ×0.50，倒下 ×1.15</div>' +
+    '<div class="cmfh">倒下次数</div>' +
+    '<div>0 / 1 / 2 / 3 / 4 / 5 次 → 1.00 / 0.90 / 0.60 / 0.32 / 0.12 / 0；死一次可能只是和 BOSS 交换，两次以上开始明显扣分，4~5 次基本把雪球滚起来。</div>' +
     '<div class="cmfh">为什么要 ÷0.80</div>' +
     '<div>内部评分队内均值恒为 1.000；÷0.80 只是换显示口径，让 1.00 = 及格线、1.25 ≈ 队内平均，排序与倍率都不变。</div>' +
     '</div></details>';

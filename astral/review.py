@@ -605,8 +605,9 @@ def _rounds_for(rp, uid):
             rows[-1]['deaths'] += 1
             rows[-1]['died'] = True
 
-    total = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move', 'transfer', 'tret')}
+    total: dict[str, float] = {k: sum(r[k] for r in rows) for k in ('kill', 'dmg', 'inj', 'gold', 'move', 'transfer', 'tret')}
     total['died'] = sum(r['deaths'] for r in rows)   # 次数而非「死过的轮数」
+    total['surv_quality'] = DEATH_QUALITY[min(max(int(total['died']), 0), len(DEATH_QUALITY) - 1)]
 
     # ── v2 派生指标 ───────────────────────────────────────
     n_rounds = len(rows) or 1
@@ -632,23 +633,29 @@ SCORE_ITEMS_V2 = [
     ('kill',     '击杀',        13,  1),
     ('transfer', '转账',        15,  1),    # 比治疗更值钱：治疗自己也在涨治疗分
     ('tret',     '治疗',        10,  1),
-    ('surv',     '存活时间',    10,  1),    # 未死亡轮次占比（仍按百分比显示）
+    ('surv',     '倒下次数',    15,  1),    # 0/1/2/3/4/5 次阶梯，越少越好
     ('ninj',     '有效承伤',     7,  1),
     ('move',     '移动步数',     5,  1),
 ]
+
+# 倒下惩罚：不按「存活轮占比」线性算，而是按次数阶梯。
+#   死一次可能只是跟 BOSS 换了，掉得很少；两次以上是玩法/操作问题；
+#   4~5 次基本等于这局把队友拖进雪球，贡献接近 0。
+#   3/4 号位通过 POS_TILT['surv'] 再加重，而不是把低分直接写给所有位置。
+DEATH_QUALITY = (1.0, 0.90, 0.60, 0.32, 0.12, 0.0)
 
 # rating 档位（队内均值严格 = 1.00）
 #   ≥1.80 SS · 1.50–1.80 S · 1.25–1.50 A · 1.00–1.25 B（平均） · 0.80–1.00 C · <0.80 D
 SCORE_GRADES = ((1.80, 'SS'), (1.50, 'S'), (1.25, 'A'), (1.00, 'B'), (0.80, 'C'))
 # 指标名下方的小注（解释这个数怎么来的）
-SCORE_NOTES = {'eff': '伤害量/星币数'}
+SCORE_NOTES = {'eff': '伤害量/星币数', 'surv': '0/1/2/3/4/5 次阶梯'}
 RATING_CAP = 2.60          # 单项比值上限，防止一个极端值把整张卡抬飞
 
 POS_TILT = {
-    1: {'tret': 1.45, 'transfer': 1.45, 'dmg': 0.75, 'kill': 0.80},
-    2: {'tret': 1.10, 'transfer': 1.15, 'dmg': 1.00, 'kill': 1.00},   # 辅C：输出不再压
-    3: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50},   # 主C
-    4: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50},   # 主C（与 3 号位一致）
+    1: {'tret': 1.45, 'transfer': 1.45, 'dmg': 0.75, 'kill': 0.80, 'surv': 0.90},
+    2: {'tret': 1.10, 'transfer': 1.15, 'dmg': 1.00, 'kill': 1.00, 'surv': 0.95},   # 辅C：输出不再压
+    3: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50, 'surv': 1.15},   # 主C：倒下更伤
+    4: {'dmg': 1.15, 'kill': 1.12, 'transfer': 0.55, 'tret': 0.50, 'surv': 1.15},   # 主C（与 3 号位一致）
 }
 # 显示基准：内部 rating 均值恒为 1.00，展示时除以 BASELINE，
 # 使 1.00 = 及格线（约队内末位 20~25% 分位），队内平均落在 1.2 上下
@@ -657,7 +664,7 @@ RATING_BASELINE = 0.80
 
 def _score_raw(p, key):
     t = p.get('totals') or {}
-    alias = {'surv': 'surv_rate', 'ninj': 'nonfatal_inj'}
+    alias = {'surv': 'surv_quality', 'ninj': 'nonfatal_inj'}
     return float(t.get(alias.get(key, key), 0) or 0)
 
 
@@ -680,9 +687,9 @@ def score_players(players, tilt=True):
 
     1. 每项指标取「本人数值 ÷ 队内均值」，得到相对强度（均值 1.00）；
     2. 单项比值截断到 2.6，避免一个爆表值带偏整张卡；
-    3. 按位置软加权（1/2 号位转账·治疗↑，3/4 号位输出↑），权重归一化到 1；
-    4. rating = Σ(权重 × 比值)。因为每项比值的队内均值都是 1，
-       加权和的均值也是 1 —— 也就是「队内平均发挥 = 1.00」。
+    3. 按位置软加权（1/2 号位转账·治疗↑，3/4 号位输出↑、倒下更重），权重归一化到 1；
+    4. rating = Σ(权重 × 比值)。普通项的保底先验是 0.6 个队均；倒下次数
+       使用 0.25 先验，让 4~5 次倒下真正接近 0 分贡献。
     """
     if not players:
         return
@@ -695,9 +702,10 @@ def score_players(players, tilt=True):
             if mean <= 0:
                 r = 1.0                      # 全队都没有这项 → 中性
             else:
-                # 加 0.6 个队均做先验：(v + 0.6m) / 1.6m
-                # 0 → 0.375、均值 → 1.00、2 倍 → 1.625；队内均值仍严格是 1
-                r = (v + 0.6 * mean) / (1.6 * mean)
+                # 加先验做保底：普通指标 0.6 个队均，倒下次数用 0.25，
+                # 让「4~5 次倒下」能真正压到接近 0，而不是被 0.6 的保底抬回来。
+                prior = 0.25 if key == 'surv' else 0.6
+                r = (v + prior * mean) / ((1.0 + prior) * mean)
             r = min(max(r, 0.0), RATING_CAP)
             if direction < 0 and mean > 0:
                 r = min(max(2.0 - r, 0.0), RATING_CAP)
@@ -717,6 +725,7 @@ def score_players(players, tilt=True):
             parts.append({'key': key, 'label': label,
                           'note': SCORE_NOTES.get(key, ''),
                           'raw': round(_score_raw(p, key), 3),
+                          'deaths': int((p.get('totals') or {}).get('died') or 0),
                           'ratio': round(r, 3),
                           'norm': round(min(r / RATING_CAP, 1.0), 4),   # 进度条长度
                           'weight': round(w, 4),
