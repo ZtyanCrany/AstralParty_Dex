@@ -435,6 +435,24 @@ def _pad(s, width, right=False):
     return ((' ' * n) + s) if right else (s + (' ' * n))
 
 
+def fetch_replay_time(replay_id):
+    """从回放第一帧的 Room.start_time 取对局开始时间（拿不到返回 0）。"""
+    try:
+        from astral import replay as _rp
+        data = get_replay_file(replay_id).read_bytes()
+        rp = _rp.Replay(data)
+        for f in rp.frames:
+            room = f.get('room')
+            if room is None:
+                continue
+            t = int(getattr(room, 'start_time', 0) or getattr(room, 'create_time', 0) or 0)
+            if t:
+                return t
+    except Exception:
+        pass
+    return 0
+
+
 def fetch_replay_stats(replay_id):
     """下载（带本地缓存）并解析回放 → {玩家ID(字符串): {name,heroId,skin,gold,stats}}"""
     if not replay_id:
@@ -788,6 +806,9 @@ def get_replay_file(replay_id):
 #   导致新增字段缺失、功能不生效（例如旧缓存里没有 skin 字段时，头像会全部回落到初始皮肤；
 #   链的切分改动后，旧缓存仍会把同一串候选画两遍）。任务名不进缓存，每次按表现算。
 REVIEW_CACHE_VERSION = 27
+QUERY_HISTORY_FILE = DATA_DIR / 'query_history.json'
+QUERY_HISTORY_MAX = 30
+_QUERY_HISTORY_LOCK = threading.Lock()
 
 
 def build_review_cached(replay_id):
@@ -1943,6 +1964,15 @@ class Api:
                 'records': recs}
 
     def query(self, text, refresh=False):
+        r = self._query_impl(text, refresh)
+        try:
+            if isinstance(r, dict) and r.get('ok'):
+                self._remember_query(text, r)
+        except Exception:
+            pass
+        return r
+
+    def _query_impl(self, text, refresh=False):
         """复盘查询：回放号 → 单条对局记录；UID → 最近 10 局记录。
 
         refresh=True（界面的刷新按钮）时，「查自己」那条会重新握手，取到最新对局。
@@ -1974,7 +2004,7 @@ class Api:
                 diff = (rv or {}).get('difficulty')
             except Exception:
                 pass
-            rec = {'replayId': rid, 'time': 0, 'rank': 0, 'hero': '', 'players': players}
+            rec = {'replayId': rid, 'time': fetch_replay_time(rid), 'rank': 0, 'hero': '', 'players': players}
             self._rec_cache[rid] = rec
             return {'ok': True, 'kind': 'replay', 'replay_id': rid, 'map_name': mapname,
                     'difficulty': diff, 'records': [rec], 'stats': st}
@@ -2066,6 +2096,105 @@ class Api:
                 c.close()
             except Exception:
                 pass
+
+    # ── 复盘查询历史（只存查询类型、输入、显示名、地图/难度和时间，不含登录凭据）──
+    def _replay_meta(self, rid):
+        """回放历史只需要地图名和难度，从本机地图缓存里取。"""
+        try:
+            d = json.loads((DATA_DIR / 'replay_maps.json').read_text(encoding='utf-8'))
+            info = d.get(str(rid)) or {}
+            return str(info.get('name') or '').strip(), info.get('diff')
+        except Exception:
+            return '', None
+
+    def _load_query_history(self):
+        try:
+            d = json.loads(QUERY_HISTORY_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            return []
+        items = d.get('items') if isinstance(d, dict) else None
+        if not isinstance(items, list):
+            return []
+        out = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            key = str(it.get('key') or '')
+            query = str(it.get('query') or '')
+            if not key or not query:
+                continue
+            kind = str(it.get('kind') or '')
+            map_name = str(it.get('map_name') or '').strip()
+            difficulty = it.get('difficulty')
+            name = str(it.get('name') or '')
+            if kind == 'replay':
+                if not map_name or difficulty is None:
+                    mn, df = self._replay_meta(query)
+                    map_name = map_name or mn
+                    if difficulty is None:
+                        difficulty = df
+                name = map_name or name or ('回放 ' + query)
+            out.append({'key': key, 'kind': kind,
+                        'type': str(it.get('type') or ''), 'query': query,
+                        'name': name, 'map_name': map_name,
+                        'difficulty': difficulty, 'at': int(it.get('at') or 0)})
+        return out[:QUERY_HISTORY_MAX]
+
+    def _write_query_history(self, items):
+        try:
+            QUERY_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp = QUERY_HISTORY_FILE.with_name(QUERY_HISTORY_FILE.name + '.tmp')
+            tmp.write_text(json.dumps({'items': items[:QUERY_HISTORY_MAX]},
+                                      ensure_ascii=False), encoding='utf-8')
+            os.replace(tmp, QUERY_HISTORY_FILE)
+        except Exception:
+            pass
+
+    def _remember_query(self, text, r):
+        kind, s = self._classify(text)
+        if not kind:
+            return
+        q = str(s)
+        if kind == 'replay':
+            key = 'replay:' + q
+            label = '回放号'
+            map_name = str(r.get('map_name') or '').strip()
+            difficulty = r.get('difficulty')
+            if not map_name or difficulty is None:
+                mn, df = self._replay_meta(q)
+                map_name = map_name or mn
+                if difficulty is None:
+                    difficulty = df
+            name = map_name or ('回放 ' + q)
+        else:
+            key = 'uid:' + q
+            label = 'UID'
+            map_name, difficulty = '', None
+            name = str(r.get('nick') or '').strip() or ('UID ' + q)
+        item = {'key': key, 'kind': kind, 'type': label, 'query': q,
+                'name': name, 'map_name': map_name, 'difficulty': difficulty,
+                'at': int(time.time())}
+        with _QUERY_HISTORY_LOCK:
+            items = [x for x in self._load_query_history() if x.get('key') != key]
+            items.insert(0, item)
+            self._write_query_history(items[:QUERY_HISTORY_MAX])
+
+    def query_history(self):
+        return {'ok': True, 'items': self._load_query_history()}
+
+    def delete_query_history(self, key):
+        key = str(key or '')
+        with _QUERY_HISTORY_LOCK:
+            items = [x for x in self._load_query_history() if x.get('key') != key]
+            self._write_query_history(items)
+        return {'ok': True, 'items': items}
+
+    def clear_query_history(self):
+        try:
+            QUERY_HISTORY_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {'ok': True, 'items': []}
 
     def _auto_login_intl(self):
         """海外服免码登录：票一直在客户端 mmkv 里，现读现用（不落盘）。"""

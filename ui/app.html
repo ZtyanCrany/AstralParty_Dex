@@ -547,6 +547,42 @@
   .qme .quid .qcp{ margin-left:8px; }
   .qme .qsub{ font-size:12px; color:var(--dim); }
   .qme .qsub b{ color:var(--t-3F3A2E); font-weight:600; }
+  .qsearch{ position:relative; margin-top:14px; max-width:440px; }
+  .qsearch .row{ margin:0; }
+  /* 复盘查询 · 最近查询：点输入框才下拉，宽度跟查询按钮右边对齐，阴影收轻 */
+  .qhist{ position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:60;
+          border:1px solid var(--line); border-radius:10px;
+          background:var(--card); box-shadow:0 5px 16px var(--sh4); }
+  .qhist.hide{ display:none; }
+  .qhlist{ max-height:270px; overflow-y:auto; }
+  .qhhead{ display:flex; align-items:center; justify-content:space-between; padding:7px 11px; font-size:11.5px; color:var(--dim); border-bottom:1px solid var(--line); }
+  .qhclearwrap{ position:relative; display:inline-flex; align-items:center; }
+  .qhclear{ font-style:normal; color:var(--t-B4633A); cursor:pointer; }
+  .qhclear:hover{ color:var(--t-8E4A2A); }
+  .qhconfirm{ position:absolute; top:calc(100% + 6px); right:0; z-index:90; width:200px;
+              padding:9px 10px 8px; border:1px solid var(--line); border-radius:8px;
+              background:var(--card); box-shadow:0 6px 18px var(--sh4); text-align:left; }
+  .qhconfirm:before{ content:''; position:absolute; top:-5px; right:8px; width:0; height:0;
+                     border-left:5px solid transparent; border-right:5px solid transparent;
+                     border-bottom:5px solid var(--line); }
+  .qhconfirm:after{ content:''; position:absolute; top:-4px; right:9px; width:0; height:0;
+                    border-left:4px solid transparent; border-right:4px solid transparent;
+                    border-bottom:4px solid var(--card); }
+  .qhconfirm.hide{ display:none; }
+  .qhcmsg{ display:block; font-size:12px; line-height:1.5; color:var(--t-3F3A2E); white-space:nowrap; }
+  .qhcbtns{ display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .qhconfirm button{ padding:3px 9px; border-radius:5px; font-size:11px; line-height:1.5; font-weight:500; }
+  .qhconfirm .qhcn{ background:var(--s-F1EDE2); color:var(--t-6E6656); }
+  .qhconfirm .qhcy{ background:var(--accent); color:var(--t-FFF); }
+  .qhrow{ display:flex; align-items:center; gap:8px; padding:7px 11px; border-top:1px solid var(--line); cursor:pointer; }
+  .qhlist > .qhrow:first-child{ border-top:0; }
+  .qhrow:hover{ background:var(--s-FBF6EE); }
+  .qhkind{ flex:0 0 auto; padding:0 6px; border-radius:5px; line-height:17px; font-size:10.5px; color:var(--t-B4633A); background:var(--s-FBF6EE); }
+  .qhkind.replay{ color:var(--t-3E6088); background:var(--s-E3EAF4); }
+  .qhmeta{ flex:0 0 auto; font-size:11.5px; font-weight:600; color:var(--t-6E6656); font-variant-numeric:tabular-nums; }
+  .qhname{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--t-A79F91); }
+  .qhdel{ flex:0 0 18px; width:18px; height:18px; line-height:16px; text-align:center; border-radius:5px; color:var(--t-A79F91); font-style:normal; }
+  .qhdel:hover{ color:var(--ink); background:var(--s-EDE7DA); }
   .rvhead .rn{ font-size:16px; font-weight:700; color:var(--t-3F3A2E); }
   .rvhead .rh{ font-size:12px; color:var(--dim); display:flex; align-items:baseline;
                gap:3px; flex-wrap:wrap; }
@@ -750,6 +786,16 @@
   .mhead:hover{ background:var(--s-FAF8F3); }
   .mhead .t{ color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums;
              white-space:nowrap; }
+  /* 回放查询表头：回放号+区服独占第一行；时间/地图/评分在第二行，按最近对局的列位摆放 */
+  .match.replay .mhead{ grid-template-columns:118px max-content max-content 1fr 20px;
+                        grid-template-rows:auto auto; row-gap:10px; column-gap:10px;
+                        padding-top:8px; }
+  .match.replay .mhead .t{ grid-column:1 / -1; grid-row:1; }
+  .match.replay .mhead .qtime{ grid-column:1; grid-row:2; color:var(--dim);
+                               font-size:12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .match.replay .mhead .m{ grid-column:2; grid-row:2; }
+  .match.replay .mhead .h{ grid-column:3; grid-row:2; justify-self:start; margin-left:-5px; }
+  .match.replay .mhead .arw{ grid-column:5; grid-row:2; justify-self:end; }
   .mhead .h{ display:flex; align-items:center; gap:7px; font-weight:600; min-width:0; }
   .mhead .h > .scbtn{ flex:none; }
   .mhb{ font-size:10px !important; padding:0 7px !important; line-height:1.75 !important;
@@ -1423,10 +1469,14 @@
     <div class="pane" id="p-query">
       <h2>复盘查询</h2>
       <div class="sub" style="margin-top:7px">输入 UID 显示该玩家最近十局对局，输入回放号显示对应单条对局</div>
-      <div class="row" style="margin-top:14px">
+      <div class="qsearch">
+      <div class="row">
         <input id="qin" placeholder="UID或回放号（自动识别）" maxlength="24"
+               onfocus="openQHist()" onclick="openQHist()"
                onkeydown="if(event.key==='Enter') doQuery()">
         <button id="qbtn" onclick="doQuery()">查 询</button>
+      </div>
+      <div class="qhist hide" id="qhist"></div>
       </div>
       <div class="savemsg" id="qmsg"></div>
       <div id="qbox"></div>
@@ -1470,6 +1520,9 @@ function nav(p){
   if(m) m.scrollTop = 0;    // 与页签同理：切页回顶部。沿用上一页的滚动位会被夹回去，看着像跳一下
   if(p === 'skin' && window.__profile){
     try{ renderSkins(window.__profile); }catch(e){}
+  }
+  if(p === 'query'){
+    try{ loadQueryHistory(); }catch(e){}
   }
   syncNavInd();
   syncStabThumb();          // 面板刚显示出来才有尺寸，必须在这儿补算
@@ -2845,6 +2898,87 @@ function qDate(ts){
   const p = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+// ── 复盘查询历史：点输入框下拉、点击复用、单条删除、全部清空 ──
+window.__qhist = [];
+async function loadQueryHistory(show){
+  const box = document.getElementById('qhist');
+  if(!box) return;
+  const wasOpen = !box.classList.contains('hide');
+  let r = null;
+  try{ r = await window.pywebview.api.query_history(); }catch(e){}
+  const items = (r && r.ok && Array.isArray(r.items)) ? r.items : [];
+  window.__qhist = items;
+  if(!items.length){ box.classList.add('hide'); box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="qhhead"><span>最近查询</span>'
+    + '<span class="qhclearwrap"><i class="qhclear" onclick="qHistAskClear(event)">清空</i>'
+    + '<span class="qhconfirm hide" id="qhconfirm">'
+    + '<span class="qhcmsg">确定清空查询历史吗</span>'
+    + '<span class="qhcbtns"><button type="button" class="qhcn" onclick="qHistCancelClear(event)">取消</button>'
+    + '<button type="button" class="qhcy" onclick="qHistDoClear(event)">清空</button></span>'
+    + '</span></span></div>'
+    + '<div class="qhlist">' + items.map(it => {
+        const key = qesc(it.key), q = qesc(it.query);
+        const isReplay = it.kind === 'replay';
+        const type = qesc(it.type || (isReplay ? '回放号' : 'UID'));
+        let name;
+        if(isReplay){
+          const dn = DIFF_NAME[Number(it.difficulty)];
+          name = qesc(it.map_name || it.name || '—') + (dn ? '（' + qesc(dn) + '）' : '');
+        }else{
+          name = qesc(it.name || q);
+        }
+        const when = it.at ? qDate(it.at) : '';
+        return '<div class="qhrow" data-key="' + key + '" onclick="qHistRun(this)" title="' + qesc(when) + '">'
+          + '<span class="' + (isReplay ? 'qhkind replay' : 'qhkind') + '">' + type + '</span>'
+          + '<span class="qhmeta">' + q + '</span>'
+          + '<span class="qhname">' + name + '</span>'
+          + '<i class="qhdel" data-key="' + key + '" title="删除这条历史" onclick="event.stopPropagation();qHistDel(this)">×</i>'
+          + '</div>';
+      }).join('') + '</div>';
+  if(show || wasOpen) box.classList.remove('hide');
+  else box.classList.add('hide');
+}
+window.openQHist = () => { loadQueryHistory(true); };
+window.closeQHist = () => { const b = document.getElementById('qhist'); if(b) b.classList.add('hide'); };
+window.qHistRun = (el) => {
+  const key = (el && el.dataset) ? el.dataset.key : '';
+  const it = (window.__qhist || []).find(x => x.key === key);
+  if(!it) return;
+  closeQHist();
+  const i = document.getElementById('qin');
+  if(i) i.value = it.query;
+  doQuery(false, it.query);
+};
+window.qHistDel = async (el) => {
+  const key = (el && el.dataset) ? el.dataset.key : '';
+  if(!key) return;
+  try{ await window.pywebview.api.delete_query_history(key); }catch(e){}
+  await loadQueryHistory(true);
+};
+window.qHistAskClear = (e) => {
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  const b = document.getElementById('qhconfirm');
+  if(b) b.classList.remove('hide');
+};
+window.qHistCancelClear = (e) => {
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  const b = document.getElementById('qhconfirm');
+  if(b) b.classList.add('hide');
+};
+window.qHistDoClear = async (e) => {
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  try{ await window.pywebview.api.clear_query_history(); }catch(e){}
+  await loadQueryHistory(false);
+};
+document.addEventListener('click', (e) => {
+  if(e.target && e.target.closest && !e.target.closest('.qsearch')) closeQHist();
+  const c = document.getElementById('qhconfirm');
+  if(c && !c.classList.contains('hide') && e.target && e.target.closest && !e.target.closest('.qhclearwrap')){
+    c.classList.add('hide');
+  }
+});
+
 // 16 位回放号超出 JS 安全整数范围，必须当字符串传给复盘弹窗（内部只当缓存键用）
 function qref(rid){ return "'" + String(rid) + "'"; }
 
@@ -2852,6 +2986,7 @@ async function doQuery(refresh, text){
   const raw = String(text || ((document.getElementById('qin') || {}).value || '')).trim();
   const box = document.getElementById('qbox');
   if(!raw){ qsay('请先输入回放号或 UID', true); return; }
+  closeQHist();
   window.__qtext = raw;                       // 刷新按钮复用这次查的内容
   qsay('');
   box.innerHTML = '<div class="mload">查询中…</div>';
@@ -2863,20 +2998,21 @@ async function doQuery(refresh, text){
     return;
   }
   if(!window.__esc) window.__esc = qesc;      // 未登录时 renderStats 也要能转义
+  loadQueryHistory();                         // 成功查询后刷新「最近查询」
 
   if(r.kind === 'replay'){
     qsay('已取到这一局的回放数据' + (r.map_name ? '（' + r.map_name + '）' : ''));
     const rec = (r.records || [])[0] || {};
-    box.innerHTML = `<div class="match open">
+    box.innerHTML = `<div class="box"><div class="match open replay">
       <div class="mhead">
         <div class="t">回放号 ${qesc(r.replay_id)}${rgTag()}</div>
+        <div class="qtime">${qDate(rec.time)}</div>
         <div class="m got">${qesc(r.map_name || '未知地图')}${dChip(r.difficulty)}</div>
-        <div class="res">对局</div>
         <div class="h"><button class="scbtn mhb" onclick="openScoreModal('${r.replay_id}')" title="看本局四人的综合评分">评分 ▸</button></div>
         <div class="arw">▶</div>
       </div>
       <div class="mbody" id="qbody"></div>
-    </div>`;
+    </div></div>`;
     const body = document.getElementById('qbody');
     body.dataset.loaded = '1';
     body.innerHTML = renderStats(rec, r.stats || {}, qref(r.replay_id));
@@ -3176,6 +3312,7 @@ document.querySelectorAll('.qcp').forEach(el => { if(!el.innerHTML.trim()) el.in
 window.qReset = () => {
   const i = document.getElementById('qin'); if(i) i.value = '';
   const b = document.getElementById('qbox'); if(b) b.innerHTML = '';
+  try{ closeQHist(); }catch(e){}
   const m = document.getElementById('qmsg');
   if(m){ m.textContent = ''; m.className = 'savemsg'; }
   document.querySelectorAll('.qtoast').forEach(e => e.remove());
