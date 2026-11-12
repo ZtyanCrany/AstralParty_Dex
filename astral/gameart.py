@@ -230,8 +230,16 @@ def _steam_roots():
                 pass
     except Exception:
         pass
-    for p in ('C:/Program Files (x86)/Steam', 'C:/Program Files/Steam', 'D:/Steam', 'E:/Steam'):
-        roots.append(Path(p))
+    # 旧的固定盘符兜底改成环境变量 + 动态盘符探测，避免把开发机路径带给别人。
+    for env_name in ('ProgramFiles(x86)', 'ProgramFiles'):
+        base = os.environ.get(env_name)
+        if base:
+            roots.append(Path(base) / 'Steam')
+    try:
+        for drive in os.listdrives():
+            roots.append(Path(drive) / 'Steam')
+    except Exception:
+        pass
     # libraryfolders.vdf 里还有别的库（装在别的盘）
     extra = []
     for r in list(roots):
@@ -388,6 +396,26 @@ def all_installs():
             continue
     return dirs
 
+def install_caches(installs=None):
+    r"""安装目录内的 Addressables 缓存（与 StreamingAssets 并列的 com.unity.addressables）。
+
+    真实布局：
+        <安装>/<产物>_Data/com.unity.addressables/AssetBundles/<hash>/<bundle-hash>/__data
+    新版本会把新增立绘、卡面、甚至部分小人资源先放进这里；只扫 StreamingAssets
+    和 LocalLow 热更缓存会漏掉它们。返回的是 AssetBundles 根目录。
+    """
+    out, seen = [], set()
+    for d in (installs if installs is not None else all_installs()):
+        try:
+            root = Path(d).parents[2] / 'com.unity.addressables' / 'AssetBundles'
+            key = os.path.normcase(os.path.abspath(str(root)))
+        except Exception:
+            continue
+        if root.is_dir() and key not in seen:
+            seen.add(key)
+            out.append(root)
+    return out
+
 
 _SIG_CACHE = {}
 
@@ -410,6 +438,11 @@ def install_sig():
             names += [f.name for f in d.rglob('__data')]
         except Exception:
             continue
+    for root in install_caches():
+        try:
+            names += [f.parent.name for f in root.rglob('__data')]
+        except Exception:
+            continue
     names.sort()
     v = (hashlib.sha1('\n'.join(names).encode('utf-8')).hexdigest()[:16], len(names))
     _SIG_CACHE['v'] = v
@@ -424,6 +457,11 @@ def bundle_files(cache=None, installs=None):
     for d in (installs or []):
         try:
             out += list(d.glob('*.bundle'))
+        except Exception:
+            pass
+    for root in install_caches(installs):
+        try:
+            out += list(root.rglob('__data'))
         except Exception:
             pass
     keep = []
@@ -1114,6 +1152,15 @@ def _bundle_path_map() -> dict:
                 out.setdefault(f.name, str(f))
         except Exception:
             continue
+    # 安装目录内 Addressables 缓存：catalog 给的是 <hash>.bundle，
+    # 实际文件是 .../<hash>/__data；按父目录 hash 建立映射。
+    for root in install_caches():
+        try:
+            for f in root.rglob('__data'):
+                out.setdefault(f.parent.name, str(f))
+                out.setdefault(f.parent.name + '.bundle', str(f))
+        except Exception:
+            continue
     _BUNDLE_PATHS = out
     return out
 
@@ -1181,6 +1228,16 @@ def _target_bundle_files():
     for d in all_installs() or []:
         try:
             for p in Path(d).glob('*.bundle'):
+                st = p.stat()
+                k = (p.name, st.st_size)
+                if k not in seen:
+                    seen.add(k)
+                    files.append(str(p))
+        except Exception:
+            continue
+    for root in install_caches():
+        try:
+            for p in root.rglob('__data'):
                 st = p.stat()
                 k = (p.name, st.st_size)
                 if k not in seen:

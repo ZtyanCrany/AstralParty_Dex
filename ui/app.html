@@ -1179,10 +1179,10 @@
                         filter:blur(9px); }
   .bustright{ display:flex; flex-direction:column; gap:14px; }
   /* 相纸边框：用 border 画「环」，环是实心白纸、环内仍是透明（透出底图） */
-  .bustright .print{ margin:0; padding:0; background:transparent;
+  .bustright .print{ position:relative; margin:0; padding:0; background:transparent;
                      border:8px solid #FDFCF8; border-radius:14px;
                      box-shadow:0 10px 22px rgba(74,58,42,.10), 0 2px 6px rgba(74,58,42,.06); }
-  .bustright .print img{ display:block; max-height:31vh; max-width:47vw; border-radius:0;
+  .bustright .print img{ position:relative; display:block; max-height:31vh; max-width:47vw; border-radius:0;
                          filter:drop-shadow(0 2px 6px rgba(74,58,42,.10)); }
   .bustright .cgmiss{ display:none; align-items:center; justify-content:center;
                       width:min(47vw,520px); height:min(63vh,640px); min-height:200px;
@@ -1202,9 +1202,20 @@
   .bust .bcap .cn{ color:rgba(255,255,255,.55); font-size:10.5px; letter-spacing:.7px; }
   .bust .bcap .sn{ color:#fff; font-size:14px; font-weight:700; letter-spacing:.3px; }
   .bust .bst{ color:rgba(58,52,43,.55); font-size:12.5px; text-align:center; max-width:80vw; }
-  .bust .bx{ position:absolute; top:18px; right:22px; color:rgba(58,52,43,.55); font-size:20px;
-             cursor:pointer; opacity:.9; }
+  .bust .bx{ position:absolute; top:16px; right:20px; width:28px; height:28px;
+             display:flex; align-items:center; justify-content:center;
+             color:rgba(58,52,43,.55); font-size:20px; line-height:1; cursor:pointer;
+             opacity:.9; z-index:80; }
   .bust .bx:hover{ opacity:1; }
+  .bust .brs{ position:absolute; top:16px; right:56px; width:28px; height:28px;
+              display:flex; align-items:center; justify-content:center; padding:0;
+              border:0; border-radius:7px; background:transparent;
+              color:rgba(58,52,43,.55); cursor:pointer; z-index:80; }
+  .bust .brs:hover{ background:rgba(58,52,43,.08); color:rgba(58,52,43,.85); }
+  .bust .brs svg{ width:18px; height:18px; display:block; }
+  .bust img{ user-select:none; -webkit-user-drag:none; touch-action:none; cursor:zoom-in; }
+  .bust img.bzoom{ cursor:grab; will-change:transform; }
+  .bust img.bzoom.grabbing{ cursor:grabbing; }
   /* 夜间：深色半透明玻璃 + 冷调细框，文字反白 */
   [data-theme="dark"] .bust{ background:rgba(22,20,18,.70); }
   [data-theme="dark"] .bust .bustbg{ opacity:.16; }
@@ -1219,6 +1230,8 @@
   [data-theme="dark"] .bust .bcap .cn{ color:rgba(255,255,255,.60); }
   [data-theme="dark"] .bust .bst,
   [data-theme="dark"] .bust .bx{ color:rgba(240,238,230,.60); }
+  [data-theme="dark"] .bust .brs{ color:rgba(240,238,230,.60); }
+  [data-theme="dark"] .bust .brs:hover{ background:rgba(255,255,255,.10); color:rgba(240,238,230,.90); }
   .chip.sk{ cursor:pointer; }
   .chip.sk:hover{ filter:brightness(.97); transform:translateY(-1px); }
   /* ── 评分并排对比 ─────────────────────────────── */
@@ -1342,6 +1355,11 @@
 </div>
 <div id="bust" class="bust hide" onclick="bustAway(event)">
   <div class="bustbg" id="bustBg"></div>
+  <button class="brs" id="bustReset" type="button" onclick="resetBustView(event)" title="复原" aria-label="复原">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4.5 9A8.5 8.5 0 1 1 3.8 14"></path><path d="M4.5 4.5V9h4.5"></path>
+    </svg>
+  </button>
   <div class="bx" onclick="closeBust()">✕</div>
   <div class="bustbody">
     <div class="bustleft"><img id="artCard" alt="" style="display:none" /><figure class="cardmiss" id="artCardMiss">未获取到本机对应资源，可能是未下载</figure><i class="bustshade"></i></div>
@@ -2215,6 +2233,122 @@ function renderSkins(d){
   sbtnPaint('skb_dir', s.dir === 'asc' ? 'asc' : 'desc');
 }
 // ── 皮肤立绘大图：首次要先建索引（catalog 定位，通常几秒）──
+// ── 立绘 / CG：滚轮缩放、放大后拖动 ──
+// 1x 时完全不加 transform，布局和点击行为与原来一致；只有放大后才允许拖动。
+const BUST_ZOOM_MAX = 4;
+const BUST_ZOOM_IDS = ['artCard', 'artCg0', 'artCg1'];
+const bustZoomStates = new WeakMap();
+const bustZoomImages = () => BUST_ZOOM_IDS
+  .map(id => document.getElementById(id)).filter(Boolean);
+
+function bustZoomApply(img, st){
+  const on = st.scale > 1.0001;
+  img.style.transform = on ? `translate(${st.tx}px, ${st.ty}px) scale(${st.scale})` : '';
+  img.classList.toggle('bzoom', on);
+  if(!on){ img.classList.remove('grabbing'); img.style.cursor = ''; }
+}
+
+function bustZoomClamp(img, st){
+  if(st.scale <= 1.0001){ st.tx = 0; st.ty = 0; return; }
+  const rect = img.getBoundingClientRect();
+  const bcx = rect.left + rect.width / 2 - st.tx;
+  const bcy = rect.top + rect.height / 2 - st.ty;
+  const edge = 24;
+  st.tx = Math.max(edge - bcx, Math.min(window.innerWidth - edge - bcx, st.tx));
+  st.ty = Math.max(edge - bcy, Math.min(window.innerHeight - edge - bcy, st.ty));
+}
+
+function bustZoomReset(img){
+  const st = bustZoomStates.get(img);
+  if(!st) return;
+  st.scale = 1; st.tx = 0; st.ty = 0; st.drag = null;
+  img.classList.remove('bzoom', 'grabbing');
+  img.style.transform = '';
+  img.style.cursor = '';
+}
+window.resetBustZoom = () => bustZoomImages().forEach(bustZoomReset);
+
+let bustTopZ = 10;
+const bustLayerFor = img => (img.id === 'artCard' ? img.closest('.bustleft') : img);
+function bustFocus(img){
+  const layer = bustLayerFor(img);
+  if(!layer) return;
+  if(layer === img) img.style.position = 'relative';
+  layer.style.zIndex = String(++bustTopZ);
+}
+window.resetBustLayers = () => {
+  bustZoomImages().forEach(img => {
+    const layer = bustLayerFor(img);
+    if(layer && layer !== img) layer.style.zIndex = '';
+    img.style.zIndex = '';
+  });
+  document.querySelectorAll('.bustright .print').forEach(f => { f.style.zIndex = ''; });
+  bustTopZ = 10;
+};
+window.resetBustView = (e) => {
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  window.resetBustZoom();
+  window.resetBustLayers();
+};
+
+function bindBustZoom(){
+  for(const img of bustZoomImages()){
+    if(img.dataset.bustZoom) continue;
+    img.dataset.bustZoom = '1';
+    img.draggable = false;
+    const st = {scale: 1, tx: 0, ty: 0, drag: null};
+    bustZoomStates.set(img, st);
+    img.style.transformOrigin = 'center center';
+
+    img.addEventListener('click', () => bustFocus(img));
+    img.addEventListener('wheel', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      bustFocus(img);
+      const old = st.scale;
+      const next = Math.max(1, Math.min(BUST_ZOOM_MAX, old * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      if(Math.abs(next - old) < 1e-4) return;
+      const r = img.getBoundingClientRect();
+      const bcx = r.left + r.width / 2 - st.tx;
+      const bcy = r.top + r.height / 2 - st.ty;
+      const ratio = next / old;
+      st.tx = e.clientX - bcx - ratio * (e.clientX - bcx - st.tx);
+      st.ty = e.clientY - bcy - ratio * (e.clientY - bcy - st.ty);
+      st.scale = next;
+      if(next <= 1.0001){ st.scale = 1; st.tx = 0; st.ty = 0; }
+      bustZoomClamp(img, st);
+      bustZoomApply(img, st);
+    }, {passive: false});
+
+    img.addEventListener('pointerdown', (e) => {
+      if(st.scale <= 1.0001 || e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation();
+      bustFocus(img);
+      st.drag = {id: e.pointerId, x: e.clientX, y: e.clientY, tx: st.tx, ty: st.ty};
+      try{ img.setPointerCapture(e.pointerId); }catch(_){}
+      img.classList.add('grabbing');
+    });
+
+    img.addEventListener('pointermove', (e) => {
+      if(!st.drag || st.drag.id !== e.pointerId) return;
+      e.preventDefault();
+      st.tx = st.drag.tx + (e.clientX - st.drag.x);
+      st.ty = st.drag.ty + (e.clientY - st.drag.y);
+      bustZoomClamp(img, st);
+      bustZoomApply(img, st);
+    });
+
+    const endDrag = (e) => {
+      if(!st.drag || st.drag.id !== e.pointerId) return;
+      try{ img.releasePointerCapture(e.pointerId); }catch(_){}
+      st.drag = null;
+      img.classList.remove('grabbing');
+    };
+    img.addEventListener('pointerup', endDrag);
+    img.addEventListener('pointercancel', endDrag);
+  }
+}
+bindBustZoom();
+
 window.__bustCache = window.__bustCache || {};
 window.openBust = async (el) => {
   const hid = Number(el.dataset.hid || 0);
@@ -2228,6 +2362,8 @@ window.openBust = async (el) => {
                 cg0:  document.getElementById('artCg0'),
                 cg1:  document.getElementById('artCg1')};
   box.classList.remove('hide');
+  window.resetBustZoom();
+  window.resetBustLayers();
   const _e = window.__esc || (v => String(v == null ? '' : v));
   cap.innerHTML = '<i class="bar"></i><div class="txt">'
                 + (hero ? '<span class="cn">' + _e(hero) + '</span>' : '')

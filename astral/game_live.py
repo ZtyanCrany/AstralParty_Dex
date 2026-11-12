@@ -61,9 +61,11 @@ def steam_data_dirs(kind='cn'):
     """
     want = 'AstralParty_CN_Data' if kind == 'cn' else 'AstralParty_INT_Data'
     out, roots = [], []
-    for vdf in ((os.environ.get('ProgramFiles(x86)') or r'C:\Program Files (x86)'),
-                (os.environ.get('ProgramFiles') or r'C:\Program Files')):
-        p = Path(vdf) / 'Steam' / 'steamapps' / 'libraryfolders.vdf'
+    for env_name in ('ProgramFiles(x86)', 'ProgramFiles'):
+        base = os.environ.get(env_name)
+        if not base:
+            continue
+        p = Path(base) / 'Steam' / 'steamapps' / 'libraryfolders.vdf'
         if p.is_file():
             roots.append(p)
     try:
