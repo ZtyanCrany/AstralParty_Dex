@@ -4,6 +4,7 @@
 
 - 增加游戏安装目录内的 `com.unity.addressables/AssetBundles/.../__data` 资源扫描；新版本把新增立绘、卡面和部分小人资源放在这里，不再只依赖 StreamingAssets 与 LocalLow 热更缓存。
 - catalog 的 `<hash>.bundle` 现在会正确映射到实际 `__data` 文件；本机 731 个立绘/卡面键已全部命中，钢翼森姬 `117_04` 的两张进战 CG 恢复显示。
+- 头像扫描清单改为 HERO + catalog 的 `UT_Platform_<角色号>`；修复新角色在数据同步前启动扫描时被漏掉的问题，苍鲤 `130` 头像不再显示问号。
 - 移除代码里固定的 Steam/Program Files 盘符兜底，改为环境变量、注册表和动态盘符探测；资源路径都由本机安装目录反推。
 
 ### 🔍 立绘 / 进战 CG
