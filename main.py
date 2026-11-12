@@ -1008,12 +1008,26 @@ def art_scan_start():
         global AVATAR_DIR, PHOTO_DIR
         try:
             from astral import gameart
-            gameart.log('头像扫描开始（角色 %d 位）' % len(HERO))
+            # 不能只扫内存里的 HERO：启动时头像扫描可能早于客户端数据同步，
+            # 新角色（例如苍鲤 130）还没进 HERO，会永远漏掉。
+            # 以 catalog 里的 UT_Platform_<角色号> 为准，连同 HERO 一起补扫。
+            ids = {int(x) for x in HERO}
+            try:
+                _cat, _keys = gameart.catalog_keys(gameart.find_cache())
+                for _k in _keys:
+                    if not _k.startswith(gameart.PREFIX_AV):
+                        continue
+                    _tail = _k[len(gameart.PREFIX_AV):]
+                    if _tail.isdigit():
+                        ids.add(int(_tail))
+            except Exception:
+                pass
+            gameart.log('头像扫描开始（角色 %d 位）' % len(ids))
 
             def prog(text, i, n):
                 ART_STATE.update({'text': text, 'i': i, 'n': n})
 
-            r = gameart.ensure(sorted(HERO), progress=prog)
+            r = gameart.ensure(sorted(ids), progress=prog)
             gameart.log('头像扫描结束: %s' % r)
             if r.get('found'):
                 _AV_CACHE.clear()                      # 新提取的图需要让缓存失效
